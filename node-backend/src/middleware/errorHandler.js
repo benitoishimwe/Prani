@@ -59,6 +59,14 @@ function mapPrismaError(err) {
         message: 'Foreign key constraint failed — referenced record does not exist',
         code: 'FOREIGN_KEY_CONSTRAINT',
       };
+    case 'P2011': {
+      const fields = err.meta?.constraint || err.meta?.field_name || 'unknown field';
+      return {
+        statusCode: 400,
+        message: `A required field is missing: ${fields}`,
+        code: 'NULL_CONSTRAINT_VIOLATION',
+      };
+    }
     case 'P2014':
       return {
         statusCode: 409,
@@ -134,6 +142,27 @@ function errorHandler(err, req, res, next) {
       message: config.isDevelopment
         ? err.message
         : 'Invalid data provided to the database layer',
+    });
+  }
+
+  // ── Prisma unknown request errors (raw DB errors) ────────────────────────────
+  if (err.constructor?.name === 'PrismaClientUnknownRequestError') {
+    const msg = err.message || '';
+    if (msg.includes('22021') || msg.includes('invalid byte sequence')) {
+      return res.status(400).json({
+        error: 'INVALID_CHARACTERS',
+        message: 'One of the text fields contains unsupported characters. Please remove any special characters and try again.',
+      });
+    }
+    if (msg.includes('23514') || msg.includes('violates check constraint')) {
+      return res.status(400).json({
+        error: 'CONSTRAINT_VIOLATION',
+        message: 'The value provided is not allowed for that field.',
+      });
+    }
+    return res.status(500).json({
+      error: 'DATABASE_ERROR',
+      message: config.isDevelopment ? msg : 'A database error occurred. Please try again.',
     });
   }
 

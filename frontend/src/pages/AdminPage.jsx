@@ -11,14 +11,13 @@ const roleColors = {
   vendor: 'bg-[#FFF8E1] text-[#C9A84C]',
 };
 
-function UserRow({ user, onUpdate, onDelete }) {
+function UserRow({ user, onUpdate, onDelete, isOpen, onToggle }) {
   const [changing, setChanging] = useState(false);
-  const [roleOpen, setRoleOpen] = useState(false);
 
   const handleRoleChange = async (newRole) => {
-    if (newRole === user.role) { setRoleOpen(false); return; }
+    if (newRole === user.role) { onToggle(null); return; }
     setChanging(true);
-    setRoleOpen(false);
+    onToggle(null);
     try {
       const { data } = await adminAPI.updateUser(user.userId, { role: newRole });
       onUpdate({ ...user, role: data.role ?? newRole });
@@ -39,23 +38,26 @@ function UserRow({ user, onUpdate, onDelete }) {
         <p className="text-xs text-[#5C5C5C] truncate">{user.email}</p>
       </div>
 
-      {/* Role badge — click to open dropdown */}
+      {/* Role badge — only one dropdown open at a time (controlled by parent) */}
       <div className="relative">
         <button
-          onClick={() => setRoleOpen(!roleOpen)}
+          onClick={(e) => { e.stopPropagation(); onToggle(isOpen ? null : user.userId); }}
           disabled={changing}
           className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold capitalize transition-opacity ${roleColors[user.role] || 'bg-gray-100 text-gray-600'} ${changing ? 'opacity-50' : 'hover:opacity-80'}`}
           data-testid={`role-btn-${user.userId}`}
         >
           {changing ? <Loader size={11} className="animate-spin" /> : user.role}
-          <ChevronDown size={11} />
+          <ChevronDown size={11} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
-        {roleOpen && (
-          <div className="absolute right-0 top-full mt-1 bg-white border border-[#EBE5DB] rounded-xl shadow-lg z-20 overflow-hidden w-28" data-testid={`role-dropdown-${user.userId}`}>
+        {isOpen && (
+          <div
+            className="absolute right-0 bottom-full mb-1 bg-white border border-[#EBE5DB] rounded-xl shadow-xl z-50 w-28 py-1"
+            data-testid={`role-dropdown-${user.userId}`}
+          >
             {ROLES.map(r => (
               <button
                 key={r}
-                onClick={() => handleRoleChange(r)}
+                onClick={(e) => { e.stopPropagation(); handleRoleChange(r); }}
                 className={`w-full text-left px-3 py-2 text-xs font-medium capitalize hover:bg-[#F5F0E8] transition-colors ${r === user.role ? 'text-[#C9A84C] font-semibold' : 'text-[#2D2D2D]'}`}
                 data-testid={`role-option-${r}`}
               >
@@ -163,6 +165,7 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState('');
   const [logSearch, setLogSearch] = useState('');
   const [showAddUser, setShowAddUser] = useState(false);
+  const [openRoleUserId, setOpenRoleUserId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -227,20 +230,30 @@ export default function AdminPage() {
       </div>
 
       {tab === 'users' ? (
-        <div className="bg-white rounded-2xl border border-[#EBE5DB] overflow-hidden">
-          <div className="p-4 border-b border-[#EBE5DB] flex items-center gap-3">
+        /* No overflow-hidden — dropdowns need to escape the container */
+        <div className="bg-white rounded-2xl border border-[#EBE5DB]" onClick={() => setOpenRoleUserId(null)}>
+          <div className="p-4 border-b border-[#EBE5DB] flex items-center gap-3 rounded-t-2xl">
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5C5C5C]" />
               <input className="input-wedding pl-9 h-9 text-sm" placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} data-testid="user-search" />
             </div>
-            <button onClick={() => setShowAddUser(true)} className="btn-gold px-4 py-2 text-sm flex items-center gap-1.5" data-testid="add-user-btn">
+            <button onClick={(e) => { e.stopPropagation(); setShowAddUser(true); }} className="btn-gold px-4 py-2 text-sm flex items-center gap-1.5" data-testid="add-user-btn">
               <Plus size={16} /> Add User
             </button>
           </div>
           {loading ? (
             <div className="p-4 space-y-3">{[1,2,3].map(i => <div key={i} className="skeleton h-12 rounded-lg" />)}</div>
           ) : (
-            filteredUsers.map(u => <UserRow key={u.userId} user={u} onUpdate={handleUpdateUser} onDelete={handleDeleteUser} />)
+            filteredUsers.map(u => (
+              <UserRow
+                key={u.userId}
+                user={u}
+                onUpdate={handleUpdateUser}
+                onDelete={handleDeleteUser}
+                isOpen={openRoleUserId === u.userId}
+                onToggle={setOpenRoleUserId}
+              />
+            ))
           )}
         </div>
       ) : (

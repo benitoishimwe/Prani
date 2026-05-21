@@ -4,8 +4,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { superAdminAPI } from '../../services/api';
 import {
   ArrowLeft, Users, Plus, Loader, CheckCircle, XCircle, Save,
-  Mail, UserCheck, Copy, Check,
+  Mail, UserCheck, Copy, Check, Trash2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // ── Add Tenant Admin Modal ──────────────────────────────────────────────────
 function AddAdminModal({ tenantId, onClose, onAdded }) {
@@ -52,27 +53,56 @@ function InviteModal({ tenantId, onClose }) {
   const [form, setForm] = useState({ email: '', role: 'staff' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [sent, setSent] = useState(false);
+  const [result, setResult] = useState(null); // { email, invitationLink }
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      await superAdminAPI.inviteUser(tenantId, form);
-      setSent(true);
+      const res = await superAdminAPI.inviteUser(tenantId, form);
+      setResult({ email: form.email, invitationLink: res.data?.invitationLink });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to send invitation');
     } finally { setLoading(false); }
   };
 
-  if (sent) return (
-    <Modal title="Invitation Sent" onClose={onClose}>
-      <div className="text-center py-4">
-        <CheckCircle size={40} className="text-[#4A7C59] mx-auto mb-3" />
-        <p className="text-sm text-[#2D2D2D]">Invitation sent to <strong>{form.email}</strong></p>
-        <p className="text-xs text-[#5C5C5C] mt-1">They'll receive an email with a link to create their account.</p>
-        <button onClick={onClose} className="mt-5 px-5 py-2 bg-[#C9A84C] text-white rounded-xl text-sm font-semibold hover:bg-[#b8943f] transition-colors">Done</button>
+  const copyLink = () => {
+    if (!result?.invitationLink) return;
+    navigator.clipboard.writeText(result.invitationLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (result) return (
+    <Modal title="Invitation Created" onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <CheckCircle size={32} className="text-[#4A7C59] flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-[#2D2D2D]">Invitation created for <strong>{result.email}</strong></p>
+            <p className="text-xs text-[#5C5C5C] mt-0.5">
+              {result.invitationLink
+                ? 'Email sending is not configured — copy and share the link below manually.'
+                : 'An invitation email has been sent.'}
+            </p>
+          </div>
+        </div>
+        {result.invitationLink && (
+          <div className="bg-[#F5F0E8] rounded-xl p-3">
+            <p className="text-[10px] font-semibold text-[#9C9C9C] uppercase tracking-wide mb-1.5">Invitation Link</p>
+            <p className="text-xs text-[#2D2D2D] font-mono break-all leading-relaxed">{result.invitationLink}</p>
+            <button
+              onClick={copyLink}
+              className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-[#C9A84C] text-white rounded-lg text-xs font-semibold hover:bg-[#b8943f] transition-colors"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+          </div>
+        )}
+        <button onClick={onClose} className="px-5 py-2 bg-[#2D2D2D] text-white rounded-xl text-sm font-semibold hover:bg-black transition-colors self-end">Done</button>
       </div>
     </Modal>
   );
@@ -96,8 +126,8 @@ function InviteModal({ tenantId, onClose }) {
             onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
             className="w-full border border-[#EBE5DB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A84C]"
           >
-            {['staff', 'client', 'vendor', 'tenant_admin'].map(r => (
-              <option key={r} value={r}>{r}</option>
+            {['staff', 'client', 'vendor', 'event_manager', 'tenant_admin'].map(r => (
+              <option key={r} value={r}>{r.replace('_', ' ')}</option>
             ))}
           </select>
         </div>
@@ -191,6 +221,38 @@ function ModalActions({ onClose, loading, label }) {
   );
 }
 
+// ── Confirm-by-name delete input ──────────────────────────────────────────────
+function ConfirmDeleteInput({ tenantName, onConfirm, onClose, deleting }) {
+  const [value, setValue] = useState('');
+  const matches = value === tenantName;
+  return (
+    <div className="flex flex-col gap-3">
+      <input
+        autoFocus
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder={tenantName}
+        className="w-full border border-[#EBE5DB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+      />
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} disabled={deleting}
+          className="px-4 py-2 text-sm border border-[#EBE5DB] rounded-xl hover:bg-[#F5F0E8] transition-colors disabled:opacity-50">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={!matches || deleting}
+          className="px-4 py-2 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-40"
+        >
+          {deleting && <Loader size={13} className="animate-spin" />}
+          Delete permanently
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function TenantDetailsPage() {
   const { tenantId } = useParams();
@@ -199,7 +261,8 @@ export default function TenantDetailsPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [modal, setModal] = useState(null); // 'addAdmin' | 'invite' | {type:'impersonate', user}
+  const [modal, setModal] = useState(null); // 'addAdmin' | 'invite' | 'delete' | {type:'impersonate', user}
+  const [deleting, setDeleting] = useState(false);
   const [edits, setEdits] = useState({});
 
   const load = useCallback(async () => {
@@ -238,6 +301,20 @@ export default function TenantDetailsPage() {
     try { await superAdminAPI.deactivateTenant(tenantId); navigate('/super-admin/tenants'); } catch {}
   };
 
+  const handleHardDelete = async () => {
+    setDeleting(true);
+    try {
+      await superAdminAPI.hardDeleteTenant(tenantId);
+      toast.success(`"${tenant.name}" has been permanently deleted`);
+      navigate('/super-admin/tenants');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete tenant');
+    } finally {
+      setDeleting(false);
+      setModal(null);
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Loader size={28} className="animate-spin text-[#C9A84C]" /></div>;
   if (!tenant) return <div className="text-center py-20 text-[#5C5C5C]">Tenant not found</div>;
 
@@ -253,10 +330,17 @@ export default function TenantDetailsPage() {
           <p className="text-sm text-[#5C5C5C]">/{tenant.slug}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleDeactivate} disabled={!tenant.isActive}
-            className="px-4 py-2 text-sm border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-40">
-            Deactivate
-          </button>
+          {tenant.isActive ? (
+            <button onClick={handleDeactivate}
+              className="px-4 py-2 text-sm border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors">
+              Deactivate
+            </button>
+          ) : (
+            <button onClick={() => setModal('delete')}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors">
+              <Trash2 size={13} /> Delete Permanently
+            </button>
+          )}
           <button onClick={handleSave} disabled={saving}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-[#C9A84C] text-white rounded-xl hover:bg-[#b8943f] transition-colors disabled:opacity-60">
             {saving ? <Loader size={13} className="animate-spin" /> : <Save size={13} />} Save
@@ -283,7 +367,13 @@ export default function TenantDetailsPage() {
                 <select value={edits.subscriptionTier ?? 'free'}
                   onChange={e => setEdits(p => ({ ...p, subscriptionTier: e.target.value }))}
                   className="w-full border border-[#EBE5DB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A84C]">
-                  {['free','trial','pro','enterprise'].map(t => <option key={t} value={t}>{t}</option>)}
+                  {[
+                { value: 'free',    label: 'Free — $0'          },
+                { value: 'pro',     label: 'Pro — $29/mo'       },
+                { value: 'max',     label: 'Max — $79/mo'       },
+                { value: 'wedding', label: 'Wedding — $49 once' },
+                { value: 'trial',   label: 'Trial (14-day)'     },
+              ].map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
               <div>
@@ -344,6 +434,20 @@ export default function TenantDetailsPage() {
       </div>
 
       {/* Modals */}
+      {modal === 'delete' && (
+        <Modal title="Delete Tenant Permanently" onClose={() => !deleting && setModal(null)}>
+          <div className="flex flex-col gap-4">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-sm text-red-700">
+              <p className="font-bold mb-1">This action cannot be undone.</p>
+              <p>All data for <strong>{tenant.name}</strong> will be permanently erased — users, events, inventory, vendors, and all associated records.</p>
+            </div>
+            <p className="text-sm text-[#2D2D2D]">
+              Type <strong className="font-mono">{tenant.name}</strong> to confirm:
+            </p>
+            <ConfirmDeleteInput tenantName={tenant.name} onConfirm={handleHardDelete} onClose={() => setModal(null)} deleting={deleting} />
+          </div>
+        </Modal>
+      )}
       {modal === 'addAdmin' && (
         <AddAdminModal tenantId={tenantId} onClose={() => setModal(null)}
           onAdded={u => setUsers(prev => [u, ...prev])} />

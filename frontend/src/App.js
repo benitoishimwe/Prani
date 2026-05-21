@@ -29,12 +29,16 @@ import PlannerPage from './pages/PlannerPage';
 import SaveTheDatePage from './pages/SaveTheDatePage';
 import MarketplacePage from './pages/MarketplacePage';
 import VendorProfilePage from './pages/VendorProfilePage';
+import PublicSaveTheDatePage from './pages/PublicSaveTheDatePage';
 import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import OnboardingWizardPage from './pages/OnboardingWizardPage';
+import MessagesPage from './pages/MessagesPage';
+import BillingPage from './pages/BillingPage';
 import SuperAdminDashboard from './pages/super-admin/SuperAdminDashboard';
 import TenantsPage from './pages/super-admin/TenantsPage';
 import TenantDetailsPage from './pages/super-admin/TenantDetailsPage';
 import AuditLogsPage from './pages/super-admin/AuditLogsPage';
+import SubscriptionsPage from './pages/super-admin/SubscriptionsPage';
 import { Toaster } from 'sonner';
 import { registerServiceWorker } from './services/offline';
 import './App.css';
@@ -69,6 +73,7 @@ function AppRouter() {
       <Route path="/upload/:token"      element={<GuestUploadPage />} />
       <Route path="/accept-invitation"  element={<AcceptInvitationPage />} />
       <Route path="/marketplace"        element={<MarketplacePage />} />
+      <Route path="/card/:designId"     element={<PublicSaveTheDatePage />} />
 
       {/* Onboarding */}
       <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizardPage /></ProtectedRoute>} />
@@ -87,6 +92,8 @@ function AppRouter() {
       <Route path="/planner"            element={<Wrap><PlannerPage /></Wrap>} />
       <Route path="/save-the-date"      element={<Wrap><SaveTheDatePage /></Wrap>} />
       <Route path="/vendor-profile"     element={<Wrap><VendorProfilePage /></Wrap>} />
+      <Route path="/messages"           element={<Wrap><MessagesPage /></Wrap>} />
+      <Route path="/billing"            element={<Wrap><BillingPage /></Wrap>} />
       <Route path="/events/:eventId/album" element={<Wrap><AlbumGalleryPage /></Wrap>} />
 
       {/* Admin */}
@@ -105,6 +112,9 @@ function AppRouter() {
       } />
       <Route path="/super-admin/tenants/:tenantId" element={
         <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><TenantDetailsPage /></SuperAdminDashboard></ProtectedRoute>
+      } />
+      <Route path="/super-admin/subscriptions" element={
+        <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><SubscriptionsPage /></SuperAdminDashboard></ProtectedRoute>
       } />
       <Route path="/super-admin/audit-logs" element={
         <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><AuditLogsPage /></SuperAdminDashboard></ProtectedRoute>

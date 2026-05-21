@@ -71,33 +71,34 @@ function requireFeature(featureKey) {
       // SUPER_ADMIN always passes through
       if (req.user.role === 'super_admin') return next();
 
-      // Check plan-tier inclusion first (covers plans without DB feature rows)
+      // Check DB overrides FIRST — explicit rows override static defaults in either direction
+      const dbFeature = await prisma.subscriptionFeature.findFirst({
+        where: { plan, featureKey },
+      });
+
+      if (dbFeature !== null) {
+        if (!dbFeature.isEnabled) {
+          return paymentRequired(
+            res,
+            featureKey,
+            `The "${featureKey}" feature is not available on the "${plan}" plan. Please upgrade to access it.`
+          );
+        }
+        req.featureGate = { plan, featureKey, limitValue: dbFeature.limitValue ?? null };
+        return next();
+      }
+
+      // No DB override — fall back to static plan defaults
       if (PLAN_FEATURES[plan]?.includes(featureKey)) {
         req.featureGate = { plan, featureKey, limitValue: null };
         return next();
       }
 
-      // Fall back to explicit DB feature flag
-      const feature = await prisma.subscriptionFeature.findFirst({
-        where: { plan, featureKey },
-      });
-
-      if (!feature || !feature.isEnabled) {
-        return paymentRequired(
-          res,
-          featureKey,
-          `The "${featureKey}" feature is not available on the "${plan}" plan. Please upgrade to access it.`
-        );
-      }
-
-      // Attach feature metadata to req so handlers can read limitValue if needed
-      req.featureGate = {
-        plan,
+      return paymentRequired(
+        res,
         featureKey,
-        limitValue: feature.limitValue ?? null,
-      };
-
-      return next();
+        `The "${featureKey}" feature is not available on the "${plan}" plan. Please upgrade to access it.`
+      );
     } catch (err) {
       return next(err);
     }

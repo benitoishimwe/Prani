@@ -1,17 +1,23 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine
 
 WORKDIR /app
 
+# Install all deps (including devDeps so prisma CLI is available)
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
+# Copy prisma schema and generate the Prisma client
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+# Copy application source
 COPY . .
 
-RUN npx prisma generate
+# Remove dev-only packages (generated Prisma client in node_modules/.prisma stays)
+RUN npm prune --production
 
 EXPOSE 8080
 
 ENV NODE_ENV=production
-ENV PORT=8080
 
 CMD ["node", "src/index.js"]

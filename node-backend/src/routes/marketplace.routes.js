@@ -110,6 +110,19 @@ router.get('/inquiries', authenticate, async (req, res, next) => {
   }
 });
 
+// ─── POST /vendors/:vendorId/like — toggle like (auth, same as favorite) ──────
+router.post('/vendors/:vendorId/like', authenticate, async (req, res, next) => {
+  try {
+    const result = await marketplaceService.toggleFavorite({
+      userId: req.user.userId,
+      vendorId: req.params.vendorId,
+    });
+    return R.ok(res, result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /favorites/:vendorId — toggle favorite (auth) ──────────────────────
 router.post('/favorites/:vendorId', authenticate, async (req, res, next) => {
   try {

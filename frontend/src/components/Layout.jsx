@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import TrialBanner from './TrialBanner';
+import NotificationBell from './NotificationBell';
 import { useAuth } from '../contexts/AuthContext';
 import { useLang } from '../contexts/LanguageContext';
 import {
   LayoutDashboard, Calendar, Package, ArrowLeftRight, Users, Store,
   BarChart3, ShieldCheck, Sparkles, Settings, LogOut, Menu, X, Bell, Globe,
   CreditCard, Heart, Image, MapPin, ChevronRight, Briefcase, Star, MessageSquare,
+  Receipt,
 } from 'lucide-react';
 
 /** Navigation items per role. Returns the items the given role should see. */
@@ -26,12 +29,14 @@ function getNavItems(t, role) {
     admin:          { path: '/admin',          label: t('nav.admin'),         icon: ShieldCheck },
     settings:       { path: '/settings',       label: t('nav.settings'),      icon: Settings },
     vendor_profile: { path: '/vendor-profile', label: 'My Profile',           icon: Briefcase },
+    messages:       { path: '/messages',        label: 'Messages',             icon: MessageSquare },
+    billing:        { path: '/billing',         label: 'Billing',              icon: Receipt },
   };
 
   const byRole = {
-    tenant_admin:  ['dashboard','events','planner','inventory','transactions','staff','vendors','ai','reports','savethedate','pricing','admin','settings'],
-    event_manager: ['dashboard','events','planner','inventory','staff','marketplace','ai','savethedate','settings'],
-    staff:         ['dashboard','inventory','transactions','settings'],
+    tenant_admin:  ['dashboard','events','planner','inventory','transactions','staff','vendors','ai','reports','savethedate','pricing','admin','messages','billing','settings'],
+    event_manager: ['dashboard','events','planner','inventory','staff','marketplace','ai','savethedate','messages','settings'],
+    staff:         ['dashboard','inventory','transactions','messages','settings'],
     client:        ['dashboard','events','planner','ai','marketplace','settings'],
     vendor:        ['dashboard','vendor_profile','marketplace','settings'],
   };
@@ -42,7 +47,7 @@ function getNavItems(t, role) {
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
-  const { t, lang, switchLang } = useLang();
+  const { t, lang, switchLang, languages } = useLang();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -76,7 +81,7 @@ export default function Layout({ children }) {
           {user?.picture ? (
             <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-[#0F4C5C] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-[#0F4C5C] flex items-center justify-center flex-shrink-0">
               <span className="text-white text-xs font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
             </div>
           )}
@@ -84,6 +89,7 @@ export default function Layout({ children }) {
             <p className="text-sm font-semibold text-[#111827] truncate">{user?.name}</p>
             <p className="text-xs text-[#0F4C5C] capitalize font-medium">{user?.role?.replace('_',' ')}</p>
           </div>
+          <NotificationBell />
         </div>
       </div>
 
@@ -105,14 +111,26 @@ export default function Layout({ children }) {
 
       {/* Footer */}
       <div className="px-3 py-3 border-t border-[#E5E7EB] space-y-1">
-        <button
-          onClick={() => switchLang(lang === 'en' ? 'rw' : 'en')}
-          className="sidebar-link w-full"
-          data-testid="lang-toggle"
-        >
-          <Globe size={18} />
-          <span>{lang === 'en' ? 'Kinyarwanda' : 'English'}</span>
-        </button>
+        {/* Language selector — cycles through all 4 languages */}
+        <div className="px-2 pb-1">
+          <p className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wide mb-1.5 px-1">Language</p>
+          <div className="grid grid-cols-2 gap-1">
+            {languages.map(({ code, flag, shortLabel }) => (
+              <button
+                key={code}
+                onClick={() => switchLang(code)}
+                data-testid={`lang-${code}`}
+                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  lang === code
+                    ? 'bg-[#0F4C5C] text-white'
+                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
+                }`}
+              >
+                <span>{flag}</span> {shortLabel}
+              </button>
+            ))}
+          </div>
+        </div>
         <button
           onClick={handleLogout}
           className="sidebar-link w-full text-[#DC2626]"
@@ -158,19 +176,26 @@ export default function Layout({ children }) {
             </button>
             <span className="font-bold text-[#111827] text-base" style={{fontFamily:'Poppins,sans-serif'}}>Prani</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <NotificationBell />
             <button
-              onClick={() => switchLang(lang === 'en' ? 'rw' : 'en')}
-              className="px-2 py-1 rounded-full bg-[#E8F4F8] text-[#0F4C5C] text-xs font-semibold"
+              onClick={() => {
+                const idx = languages.findIndex(l => l.code === lang);
+                switchLang(languages[(idx + 1) % languages.length].code);
+              }}
+              className="px-2.5 py-1 rounded-full bg-[#E8F4F8] text-[#0F4C5C] text-xs font-semibold flex items-center gap-1"
               data-testid="lang-toggle-mobile"
+              title="Change language"
             >
-              {lang === 'en' ? 'RW' : 'EN'}
+              {languages.find(l => l.code === lang)?.flag}
+              {languages.find(l => l.code === lang)?.shortLabel}
             </button>
           </div>
         </header>
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+          <TrialBanner />
           <div className="animate-fade-in">
             {children}
           </div>

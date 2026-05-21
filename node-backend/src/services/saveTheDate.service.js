@@ -167,6 +167,34 @@ async function publishDesign(designId, userId) {
 }
 
 /**
+ * Unpublish a design — sets status back to 'generated' (or 'draft' if never generated).
+ *
+ * @param {string} designId
+ * @param {string} userId
+ */
+async function unpublishDesign(designId, userId) {
+  const design = await getDesignById(designId, userId);
+  const revertTo = design.generatedImageUrl ? 'generated' : 'draft';
+  return prisma.saveTheDateDesign.update({
+    where: { designId },
+    data: { status: revertTo },
+  });
+}
+
+/**
+ * Get a published design for public viewing (no auth required).
+ *
+ * @param {string} designId
+ */
+async function getPublicDesign(designId) {
+  const design = await prisma.saveTheDateDesign.findUnique({ where: { designId } });
+  if (!design || design.status !== 'published') {
+    throw new AppError('Design not found or not published', 404, 'DESIGN_NOT_FOUND');
+  }
+  return design;
+}
+
+/**
  * Upload a photo for a design.
  * Tries Supabase Storage first; falls back to base64 data URL if Supabase is
  * not configured or the upload fails (e.g. no bucket, wrong credentials).
@@ -294,6 +322,8 @@ module.exports = {
   updateDesign,
   deleteDesign,
   publishDesign,
+  unpublishDesign,
+  getPublicDesign,
   uploadPhoto,
   generateDesign,
   getTemplates,

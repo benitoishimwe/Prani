@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useLang } from '../contexts/LanguageContext';
 import { transactionAPI, inventoryAPI, eventsAPI } from '../services/api';
-import { Plus, ArrowLeftRight, Loader, Package, Calendar, User, X, Clock, Hash, RotateCcw } from 'lucide-react';
+import { Plus, ArrowLeftRight, Loader, Package, Calendar, User, X, Clock, Hash, RotateCcw, Edit2, Save } from 'lucide-react';
+import { toast } from 'sonner';
 
 const TX_COLORS = {
   rent:    'bg-orange-50 text-orange-700 border border-orange-200',
@@ -30,25 +31,73 @@ const TX_ICONS = {
   damage: { icon: '⚠️', label: 'Damage Reported' },
 };
 
-function TransactionDetailModal({ tx, onClose }) {
-  const meta = TX_ICONS[tx.type] || { icon: '📋', label: tx.type };
+const TX_HEADER_BG = {
+  rent: 'bg-orange-50', return: 'bg-emerald-50', wash: 'bg-blue-50',
+  buy: 'bg-purple-50', lost: 'bg-red-50', damage: 'bg-rose-50',
+};
+
+function TransactionDetailModal({ tx: initialTx, onClose, onUpdated }) {
+  const [tx, setTx] = useState(initialTx);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [form, setForm] = useState({
+    eventId:     initialTx.eventId      || '',
+    daysToReturn: initialTx.daysToReturn != null ? String(initialTx.daysToReturn) : '',
+  });
+
+  const meta  = TX_ICONS[tx.type]  || { icon: '📋', label: tx.type };
   const color = TX_COLORS[tx.type] || 'bg-gray-100 text-gray-600 border border-gray-200';
+  const headerBg = TX_HEADER_BG[tx.type] || 'bg-gray-50';
+
+  useEffect(() => {
+    if (editing && events.length === 0) {
+      eventsAPI.list({ size: 100 }).then(r => setEvents(r.data?.events || [])).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const selectedEvent = events.find(e => e.eventId === form.eventId);
+      const payload = {
+        eventId:     form.eventId    || null,
+        eventName:   selectedEvent?.name || null,
+        daysToReturn: form.daysToReturn ? parseInt(form.daysToReturn, 10) : null,
+      };
+      const { data } = await transactionAPI.update(tx.transactionId, payload);
+      setTx(data);
+      setEditing(false);
+      onUpdated?.(data);
+      toast.success('Transaction updated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update transaction');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setForm({
+      eventId:     tx.eventId      || '',
+      daysToReturn: tx.daysToReturn != null ? String(tx.daysToReturn) : '',
+    });
+    setEditing(false);
+  };
+
+  const expectedReturn = tx.daysToReturn
+    ? new Date(new Date(tx.createdAt).getTime() + tx.daysToReturn * 86400000)
+    : null;
 
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl animate-slide-up">
-        {/* Header strip */}
-        <div className={`px-6 py-4 rounded-t-2xl flex items-center justify-between ${
-          tx.type === 'rent'   ? 'bg-orange-50' :
-          tx.type === 'return' ? 'bg-emerald-50' :
-          tx.type === 'wash'   ? 'bg-blue-50' :
-          tx.type === 'buy'    ? 'bg-purple-50' :
-          tx.type === 'lost'   ? 'bg-red-50' :
-          tx.type === 'damage' ? 'bg-rose-50' : 'bg-gray-50'
-        }`}>
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl animate-slide-up overflow-hidden">
+        {/* Header */}
+        <div className={`px-6 py-4 flex items-center justify-between ${headerBg}`}>
           <div className="flex items-center gap-3">
             <span className="text-2xl">{meta.icon}</span>
             <div>
@@ -56,75 +105,154 @@ function TransactionDetailModal({ tx, onClose }) {
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>{tx.type}</span>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/70 flex items-center justify-center hover:bg-white transition-colors">
-            <X size={15} className="text-[#5C5C5C]" />
-          </button>
+          <div className="flex items-center gap-2">
+            {!editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 text-[#5C5C5C] text-xs font-semibold hover:bg-white transition-colors"
+              >
+                <Edit2 size={12} /> Edit
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-white/70 flex items-center justify-center hover:bg-white transition-colors"
+            >
+              <X size={15} className="text-[#5C5C5C]" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          {/* Item */}
-          <div className="flex items-start gap-3 p-3.5 bg-[#F5F0E8] rounded-xl">
+          {/* Item card — always read-only */}
+          <div className="flex items-center gap-3 p-3.5 bg-[#F5F0E8] rounded-xl">
             <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
               <Package size={18} className="text-[#C9A84C]" />
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-[#5C5C5C] uppercase tracking-wide mb-0.5">Item</p>
               <p className="font-bold text-[#2D2D2D] text-sm">{tx.itemName}</p>
-              {tx.quantity > 1 && (
-                <p className="text-xs text-[#C9A84C] font-semibold mt-0.5">×{tx.quantity} units</p>
-              )}
+              <p className="text-xs text-[#C9A84C] font-semibold mt-0.5">×{tx.quantity} {tx.quantity === 1 ? 'unit' : 'units'}</p>
             </div>
           </div>
 
-          {/* Detail grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {tx.eventName && (
+          {editing ? (
+            /* ── Edit form ── */
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#5C5C5C] uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <Calendar size={11} /> Link to Event
+                </label>
+                <select
+                  className="input-wedding"
+                  value={form.eventId}
+                  onChange={(e) => setForm({ ...form, eventId: e.target.value })}
+                >
+                  <option value="">No event linked</option>
+                  {events.map(ev => (
+                    <option key={ev.eventId} value={ev.eventId}>{ev.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#5C5C5C] uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <RotateCcw size={11} /> Days to Return
+                </label>
+                <div className="relative">
+                  <input
+                    className="input-wedding pr-16"
+                    type="number"
+                    min="1"
+                    max="365"
+                    placeholder="e.g. 7"
+                    value={form.daysToReturn}
+                    onChange={(e) => setForm({ ...form, daysToReturn: e.target.value })}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#9C9C9C]">days</span>
+                </div>
+                {form.daysToReturn && Number(form.daysToReturn) > 0 && (
+                  <p className="text-xs text-[#C9A84C] mt-1">
+                    Expected: {new Date(Date.now() + Number(form.daysToReturn) * 86400000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="flex-1 h-10 rounded-full border-2 border-[#EBE5DB] text-[#5C5C5C] text-sm font-medium hover:border-[#C9A84C]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 btn-gold h-10 flex items-center justify-center gap-2 text-sm font-semibold"
+                >
+                  {saving ? <Loader size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── View mode ── */
+            <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-[#F9F9FB] rounded-xl">
                 <p className="text-xs text-[#5C5C5C] font-semibold mb-1 flex items-center gap-1">
                   <Calendar size={11} /> Event
                 </p>
-                <p className="text-sm font-medium text-[#2D2D2D] truncate">{tx.eventName}</p>
+                <p className="text-sm font-medium text-[#2D2D2D] truncate">{tx.eventName || <span className="text-[#BEBEBE]">—</span>}</p>
               </div>
-            )}
-            {tx.staffName && (
+
               <div className="p-3 bg-[#F9F9FB] rounded-xl">
                 <p className="text-xs text-[#5C5C5C] font-semibold mb-1 flex items-center gap-1">
                   <User size={11} /> Staff
                 </p>
-                <p className="text-sm font-medium text-[#2D2D2D] truncate">{tx.staffName}</p>
+                <p className="text-sm font-medium text-[#2D2D2D] truncate">{tx.staffName || <span className="text-[#BEBEBE]">—</span>}</p>
               </div>
-            )}
-            <div className="p-3 bg-[#F9F9FB] rounded-xl">
-              <p className="text-xs text-[#5C5C5C] font-semibold mb-1 flex items-center gap-1">
-                <Hash size={11} /> Quantity
-              </p>
-              <p className="text-sm font-bold text-[#2D2D2D]">{tx.quantity}</p>
-            </div>
-            <div className="p-3 bg-[#F9F9FB] rounded-xl">
-              <p className="text-xs text-[#5C5C5C] font-semibold mb-1 flex items-center gap-1">
-                <Clock size={11} /> Date
-              </p>
-              <p className="text-sm font-medium text-[#2D2D2D]">
-                {new Date(tx.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </p>
-            </div>
-            {tx.returnDate && (
-              <div className="col-span-2 p-3 bg-[#FEF3C7] rounded-xl">
-                <p className="text-xs text-[#D97706] font-semibold mb-1 flex items-center gap-1">
-                  <RotateCcw size={11} /> Expected Return
+
+              <div className="p-3 bg-[#F9F9FB] rounded-xl">
+                <p className="text-xs text-[#5C5C5C] font-semibold mb-1 flex items-center gap-1">
+                  <Hash size={11} /> Quantity
+                </p>
+                <p className="text-sm font-bold text-[#2D2D2D]">{tx.quantity}</p>
+              </div>
+
+              <div className="p-3 bg-[#F9F9FB] rounded-xl">
+                <p className="text-xs text-[#5C5C5C] font-semibold mb-1 flex items-center gap-1">
+                  <Clock size={11} /> Recorded
                 </p>
                 <p className="text-sm font-medium text-[#2D2D2D]">
-                  {new Date(tx.returnDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {new Date(tx.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </p>
               </div>
-            )}
-          </div>
 
-          {/* Transaction ID */}
-          <p className="text-[10px] text-[#BEBEBE] text-center font-mono">
-            ID: {tx.transactionId}
-          </p>
+              {expectedReturn ? (
+                <div className="col-span-2 p-3 bg-[#FEF3C7] rounded-xl">
+                  <p className="text-xs text-[#D97706] font-semibold mb-1 flex items-center gap-1">
+                    <RotateCcw size={11} /> Expected Return
+                  </p>
+                  <p className="text-sm font-medium text-[#2D2D2D]">
+                    {expectedReturn.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
+                  <p className="text-xs text-[#D97706] mt-0.5">{tx.daysToReturn} days from creation</p>
+                </div>
+              ) : (
+                <div className="col-span-2 p-3 bg-[#F9F9FB] rounded-xl">
+                  <p className="text-xs text-[#5C5C5C] font-semibold mb-1 flex items-center gap-1">
+                    <RotateCcw size={11} /> Expected Return
+                  </p>
+                  <p className="text-sm text-[#BEBEBE]">Not set</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="text-[10px] text-[#BEBEBE] text-center font-mono">ID: {tx.transactionId}</p>
         </div>
       </div>
     </div>
@@ -139,7 +267,7 @@ function NewTransactionModal({ onClose, onSave }) {
     eventId: '',
     quantity: 1,
     notes: '',
-    returnDate: '',
+    daysToReturn: '',
   });
   const [items, setItems] = useState([]);
   const [events, setEvents] = useState([]);
@@ -170,8 +298,8 @@ function NewTransactionModal({ onClose, onSave }) {
         itemId: form.itemId,
         quantity: Number(form.quantity),
       };
-      if (form.eventId)    payload.eventId    = form.eventId;
-      if (form.returnDate) payload.returnDate = form.returnDate;
+      if (form.eventId)     payload.eventId     = form.eventId;
+      if (form.daysToReturn) payload.daysToReturn = parseInt(form.daysToReturn, 10);
 
       const { data } = await transactionAPI.create(payload);
       onSave(data);
@@ -285,14 +413,25 @@ function NewTransactionModal({ onClose, onSave }) {
             {form.type === 'rent' && (
               <div>
                 <label className="block text-xs font-semibold text-[#5C5C5C] uppercase tracking-wide mb-1.5">
-                  Expected Return
+                  Days to Return
                 </label>
-                <input
-                  className="input-wedding"
-                  type="date"
-                  value={form.returnDate}
-                  onChange={(e) => setForm({ ...form, returnDate: e.target.value })}
-                />
+                <div className="relative">
+                  <input
+                    className="input-wedding pr-16"
+                    type="number"
+                    min="1"
+                    max="365"
+                    placeholder="e.g. 7"
+                    value={form.daysToReturn}
+                    onChange={(e) => setForm({ ...form, daysToReturn: e.target.value })}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#9C9C9C]">days</span>
+                </div>
+                {form.daysToReturn && Number(form.daysToReturn) > 0 && (
+                  <p className="text-xs text-[#C9A84C] mt-1">
+                    Expected: {new Date(Date.now() + Number(form.daysToReturn) * 86400000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -347,6 +486,7 @@ export default function TransactionsPage() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchTxs(); }, [typeFilter]);
 
   const filters = [
@@ -502,7 +642,14 @@ export default function TransactionsPage() {
         />
       )}
       {selectedTx && (
-        <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
+        <TransactionDetailModal
+          tx={selectedTx}
+          onClose={() => setSelectedTx(null)}
+          onUpdated={(updated) => {
+            setTxs(prev => prev.map(t => t.transactionId === updated.transactionId ? { ...t, ...updated } : t));
+            setSelectedTx(prev => ({ ...prev, ...updated }));
+          }}
+        />
       )}
     </div>
   );

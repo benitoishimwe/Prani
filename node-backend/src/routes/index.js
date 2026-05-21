@@ -16,6 +16,9 @@
  */
 
 const { Router } = require('express');
+const { authenticate } = require('../middleware/auth');
+const albumService = require('../services/album.service');
+const R = require('../utils/response');
 
 const authRoutes         = require('./auth.routes');
 const adminRoutes        = require('./admin.routes');
@@ -36,8 +39,45 @@ const inventoryRoutes    = require('./inventory.routes');
 const transactionRoutes  = require('./transaction.routes');
 const staffRoutes        = require('./staff.routes');
 const superAdminRoutes   = require('./super-admin.routes');
+const messagesRoutes       = require('./messages.routes');
+const notificationRoutes   = require('./notification.routes');
 
 const router = Router();
+
+// ── Event-scoped album routes (/events/:eventId/albums) ───────────────────────
+router.post('/events/:eventId/albums', authenticate, async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenantId;
+    if (!tenantId) return R.badRequest(res, 'Tenant context required');
+    const { title, description, maxFileSizeMb, allowVideos } = req.body;
+    const album = await albumService.createAlbum({
+      tenantId,
+      eventId: req.params.eventId,
+      title: title || 'Live Album',
+      description: description || null,
+      maxFileSizeMb: maxFileSizeMb !== undefined ? parseInt(maxFileSizeMb, 10) : 50,
+      allowVideos: allowVideos !== undefined ? allowVideos === true || allowVideos === 'true' : true,
+      createdBy: req.user.userId,
+    });
+    return R.created(res, album, 'Album created successfully');
+  } catch (err) { next(err); }
+});
+
+router.get('/events/:eventId/albums', authenticate, async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenantId;
+    if (!tenantId) return R.badRequest(res, 'Tenant context required');
+
+    // Return first album for this event with all its media — shape: { album, media, media_count }
+    const { data: albums } = await albumService.listAlbums({ tenantId, eventId: req.params.eventId, size: 1 });
+    if (!albums || albums.length === 0) {
+      return R.notFound(res, 'No album for this event');
+    }
+    const album = albums[0];
+    const { data: media } = await albumService.listMedia({ albumId: album.albumId, size: 200 });
+    return R.ok(res, { album, media, media_count: media.length });
+  } catch (err) { next(err); }
+});
 
 router.use('/auth',           authRoutes);
 router.use('/admin',          adminRoutes);
@@ -58,5 +98,7 @@ router.use('/inventory',      inventoryRoutes);
 router.use('/transactions',   transactionRoutes);
 router.use('/staff',          staffRoutes);
 router.use('/super-admin',    superAdminRoutes);
+router.use('/messages',       messagesRoutes);
+router.use('/notifications',  notificationRoutes);
 
 module.exports = router;

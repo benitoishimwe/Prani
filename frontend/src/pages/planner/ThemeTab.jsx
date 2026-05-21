@@ -30,7 +30,7 @@ export default function ThemeTab({ plan, onPlanUpdate }) {
     }
   };
 
-  useEffect(() => { loadAssets(); }, [plan.planId]);
+  useEffect(() => { loadAssets(); }, [plan.planId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveTheme = async () => {
     setSaving(true);

@@ -41,6 +41,8 @@ model Tenant {
   transactions       Transaction[]
   shifts             Shift[]
   invitations        TenantInvitation[]
+  messages           Message[]
+  notifications      Notification[]
 
   @@map("tenants")
 }
@@ -74,6 +76,10 @@ model User {
   emailOtps          EmailOtp[]
   auditLogs          AuditLog[]
   invitationsSent    TenantInvitation[] @relation("InvitedBy")
+  messagesSent       Message[]          @relation("MessageSender")
+  vendorProfile      Vendor?            @relation("VendorUser")
+  assignedTasks      EventTask[]        @relation("TaskAssignee")
+  notifications      Notification[]
 
   @@map("users")
 }
@@ -111,6 +117,7 @@ model Event {
   shifts             Shift[]
   vendorReviews      VendorReview[]
   vendorInquiries    VendorInquiry[]
+  messages           Message[]
 
   @@map("events")
 }
@@ -138,14 +145,16 @@ model EventTask {
   category    String?
   dueDate     DateTime? @map("due_date")
   assignedTo  String?   @map("assigned_to") @db.Uuid
+  assignedAt  DateTime? @map("assigned_at") @db.Timestamptz
   status      String    @default("todo")
   priority    String    @default("medium")
   createdBy   String?   @map("created_by") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  event  Event  @relation(fields: [eventId], references: [eventId])
-  tenant Tenant @relation(fields: [tenantId], references: [tenantId])
+  event    Event  @relation(fields: [eventId], references: [eventId])
+  tenant   Tenant @relation(fields: [tenantId], references: [tenantId])
+  assignee User?  @relation("TaskAssignee", fields: [assignedTo], references: [userId])
 
   @@map("event_tasks")
 }
@@ -203,25 +212,40 @@ model Payment {
 }
 
 model Vendor {
-  vendorId    String   @id @default(uuid()) @map("vendor_id") @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  name        String
-  category    String
-  contactName String?  @map("contact_name")
-  email       String?
-  phone       String?
-  location    String?
-  rating      Decimal  @default(0) @db.Decimal(3, 2)
-  isVerified  Boolean  @default(false) @map("is_verified")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
+  vendorId           String    @id @default(uuid()) @map("vendor_id") @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  userId             String?   @unique @map("user_id") @db.Uuid
+  name               String
+  category           String
+  contactName        String?   @map("contact_name")
+  email              String?
+  phone              String?
+  location           String?
+  description        String?
+  rating             Decimal   @default(0) @db.Decimal(3, 2)
+  ratingCount        Int       @default(0) @map("rating_count")
+  viewCount          Int       @default(0) @map("view_count")
+  likeCount          Int       @default(0) @map("like_count")
+  isVerified         Boolean   @default(false) @map("is_verified")
+  isActive           Boolean   @default(true) @map("is_active")
+  isPublic           Boolean   @default(false) @map("is_public")
+  onboardingComplete Boolean   @default(false) @map("onboarding_complete")
+  approvedByAdmin    Boolean   @default(false) @map("approved_by_admin")
+  approvedAt         DateTime? @map("approved_at")
+  rejectedReason     String?   @map("rejected_reason")
+  internalNotes      String?   @map("internal_notes")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  tenant     Tenant          @relation(fields: [tenantId], references: [tenantId])
+  tenant     Tenant             @relation(fields: [tenantId], references: [tenantId])
+  linkedUser User?              @relation("VendorUser", fields: [userId], references: [userId])
   profile    VendorProfile?
   portfolio  VendorPortfolio[]
   reviews    VendorReview[]
   favorites  VendorFavorite[]
   inquiries  VendorInquiry[]
+  onboarding VendorOnboarding?
+  analytics  VendorAnalytics[]
 
   @@map("vendors")
 }
@@ -314,6 +338,33 @@ model VendorInquiry {
   event  Event?  @relation(fields: [eventId], references: [eventId])
 
   @@map("vendor_inquiries")
+}
+
+model VendorOnboarding {
+  vendorId               String    @id @map("vendor_id") @db.Uuid
+  stepBio                Boolean   @default(false) @map("step_bio")
+  stepPricing            Boolean   @default(false) @map("step_pricing")
+  stepPhotos             Boolean   @default(false) @map("step_photos")
+  stepMarketplaceConsent Boolean   @default(false) @map("step_marketplace_consent")
+  completedAt            DateTime? @map("completed_at")
+
+  vendor Vendor @relation(fields: [vendorId], references: [vendorId], onDelete: Cascade)
+
+  @@map("vendor_onboarding")
+}
+
+model VendorAnalytics {
+  analyticsId String   @id @default(uuid()) @map("analytics_id") @db.Uuid
+  vendorId    String   @map("vendor_id") @db.Uuid
+  date        DateTime @db.Date
+  views       Int      @default(0)
+  likes       Int      @default(0)
+  inquiries   Int      @default(0)
+
+  vendor Vendor @relation(fields: [vendorId], references: [vendorId], onDelete: Cascade)
+
+  @@unique([vendorId, date])
+  @@map("vendor_analytics")
 }
 
 model WeddingPlan {
@@ -530,6 +581,7 @@ model Transaction {
   quantity      Int?
   photo         String?
   returnDate    DateTime? @map("return_date")
+  daysToReturn  Int?      @map("days_to_return")
   createdAt     DateTime  @default(now()) @map("created_at")
 
   tenant Tenant         @relation(fields: [tenantId], references: [tenantId])
@@ -614,4 +666,41 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [userId])
 
   @@map("audit_logs")
+}
+
+model Message {
+  messageId   String   @id @default(uuid()) @map("message_id") @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  eventId     String?  @map("event_id") @db.Uuid
+  senderId    String   @map("sender_id") @db.Uuid
+  senderName  String   @map("sender_name")
+  senderRole  String   @map("sender_role")
+  recipientId String?  @map("recipient_id")
+  content     String
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [tenantId])
+  event  Event? @relation(fields: [eventId], references: [eventId])
+  sender User   @relation("MessageSender", fields: [senderId], references: [userId])
+
+  @@map("messages")
+}
+
+model Notification {
+  notificationId String   @id @default(uuid()) @map("notification_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  type           String
+  title          String
+  body           String?
+  resourceId     String?  @map("resource_id") @db.Uuid
+  resourceType   String?  @map("resource_type")
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [userId])
+  tenant Tenant @relation(fields: [tenantId], references: [tenantId])
+
+  @@map("notifications")
 }

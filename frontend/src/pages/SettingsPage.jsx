@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLang } from '../contexts/LanguageContext';
+import { useLang, LANGUAGES } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import { Settings, Globe, ShieldCheck, Bell, Accessibility, Eye, Type, Loader, CheckCircle } from 'lucide-react';
@@ -73,21 +73,25 @@ export default function SettingsPage() {
 
       {/* Language */}
       <Section title={t('settings.language')} icon={Globe}>
-        <div className="flex gap-3">
-          {[{ k: 'en', l: t('settings.english') }, { k: 'rw', l: t('settings.kinyarwanda') }].map(({ k, l }) => (
-            <button
-              key={k}
-              onClick={() => switchLang(k)}
-              className={`flex-1 h-12 rounded-xl font-semibold text-sm transition-all ${
-                lang === k
-                  ? 'bg-[#C9A84C] text-white shadow-md'
-                  : 'bg-[#F5F0E8] text-[#5C5C5C] hover:border-[#C9A84C] border border-transparent'
-              }`}
-              data-testid={`lang-btn-${k}`}
-            >
-              {l}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-3">
+          {LANGUAGES.map(({ code, flag }) => {
+            const labelKey = code === 'en' ? 'english' : code === 'rw' ? 'kinyarwanda' : code === 'fr' ? 'french' : 'swahili';
+            return (
+              <button
+                key={code}
+                onClick={() => switchLang(code)}
+                className={`h-12 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                  lang === code
+                    ? 'bg-[#C9A84C] text-white shadow-md'
+                    : 'bg-[#F5F0E8] text-[#5C5C5C] hover:border-[#C9A84C] border border-transparent'
+                }`}
+                data-testid={`lang-btn-${code}`}
+              >
+                <span>{flag}</span>
+                {t(`settings.${labelKey}`)}
+              </button>
+            );
+          })}
         </div>
       </Section>
 

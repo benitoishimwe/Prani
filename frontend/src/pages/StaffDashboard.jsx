@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLang } from '../contexts/LanguageContext';
-import { staffAPI } from '../services/api';
+import { staffAPI, eventsAPI } from '../services/api';
 import {
   Clock, Calendar, CheckSquare, ArrowLeftRight, Scan,
   ChevronRight, MapPin, Briefcase, AlertCircle,
@@ -141,6 +141,9 @@ function TaskList({ tasks, onToggle }) {
     <div className="card-wedding p-6 animate-slide-up stagger-2">
       <h2 className="text-base font-bold text-[#2D2D2D] mb-4" style={{ fontFamily: 'Playfair Display,serif' }}>
         My Tasks
+        <span className="ml-2 px-2 py-0.5 rounded-full bg-[#C9A84C20] text-[#C9A84C] text-xs font-bold align-middle">
+          {tasks.filter(t => t.status !== 'done').length}
+        </span>
       </h2>
       <div className="space-y-2.5">
         {tasks.map((task) => (
@@ -164,9 +167,16 @@ function TaskList({ tasks, onToggle }) {
               <p className={`text-sm font-medium ${task.status === 'done' ? 'line-through text-[#9CA3AF]' : 'text-[#2D2D2D]'}`}>
                 {task.title}
               </p>
-              {task.dueDate && (
-                <p className="text-xs text-[#5C5C5C]">Due {formatDate(task.dueDate)}</p>
-              )}
+              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                {task.event?.name && (
+                  <span className="text-xs text-[#5C5C5C] bg-[#F5F0E8] px-1.5 py-0.5 rounded truncate max-w-[160px]">
+                    {task.event.name}
+                  </span>
+                )}
+                {task.dueDate && (
+                  <span className="text-xs text-[#5C5C5C]">Due {formatDate(task.dueDate)}</span>
+                )}
+              </div>
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize whitespace-nowrap ${STATUS_COLORS[task.status] || ''}`}>
               {task.status?.replace('_', ' ')}
@@ -234,7 +244,7 @@ function RecentTransactions({ transactions }) {
                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${TX_COLORS[tx.type] || 'bg-gray-100 text-gray-600'}`}>
                   {tx.type}
                 </span>
-                <p className="text-sm font-medium text-[#2D2D2D]">{tx.itemName || '—'}</p>
+                <p className="text-sm font-medium text-[#2D2D2D]">{tx.itemName || tx.item?.name || '—'}</p>
               </div>
               <p className="text-xs text-[#5C5C5C]">{new Date(tx.createdAt).toLocaleDateString()}</p>
             </div>
@@ -261,12 +271,34 @@ export default function StaffDashboard() {
       try {
         const [shiftRes, taskRes, txRes] = await Promise.allSettled([
           staffAPI.myShifts(),
-          staffAPI.myTasks(),
+          eventsAPI.assignedToMe(),
           staffAPI.myRecentTransactions(),
         ]);
 
-        if (shiftRes.status === 'fulfilled') setShifts(shiftRes.value.data || { today: null, upcoming: [] });
-        if (taskRes.status === 'fulfilled')  setTasks((taskRes.value.data?.tasks) || []);
+        let shiftsData = shiftRes.status === 'fulfilled'
+          ? (shiftRes.value.data || { today: null, upcoming: [] })
+          : { today: null, upcoming: [] };
+
+        // Merge demo shifts from localStorage assigned to this user (fallback for unsynced demo shifts)
+        if (user?.userId) {
+          const demoShifts = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
+          const mine = demoShifts.filter((s) => s.staffId === user.userId && s.date);
+          if (mine.length > 0) {
+            const todayStr = new Date().toDateString();
+            const todayDemo = mine.find((s) => new Date(s.date).toDateString() === todayStr);
+            const upcomingDemo = mine.filter((s) => new Date(s.date) > new Date() && new Date(s.date).toDateString() !== todayStr);
+            if (!shiftsData.today && todayDemo) shiftsData = { ...shiftsData, today: todayDemo };
+            if (upcomingDemo.length > 0) {
+              shiftsData = {
+                ...shiftsData,
+                upcoming: [...shiftsData.upcoming, ...upcomingDemo].slice(0, 5),
+              };
+            }
+          }
+        }
+
+        setShifts(shiftsData);
+        if (taskRes.status === 'fulfilled')  setTasks(taskRes.value.data?.tasks || []);
         if (txRes.status === 'fulfilled')    setTransactions((txRes.value.data?.transactions) || []);
       } catch (e) {
         setError('Failed to load dashboard data');
@@ -274,14 +306,13 @@ export default function StaffDashboard() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [user?.userId]);
 
   const handleToggleTask = useCallback(async (taskId, newStatus) => {
     setTasks((prev) => prev.map((t) => t.taskId === taskId ? { ...t, status: newStatus } : t));
     try {
-      await staffAPI.updateMyTask(taskId, { status: newStatus });
+      await eventsAPI.updateTaskStatus(taskId, newStatus);
     } catch {
-      // revert on failure
       setTasks((prev) => prev.map((t) => t.taskId === taskId ? { ...t } : t));
     }
   }, []);

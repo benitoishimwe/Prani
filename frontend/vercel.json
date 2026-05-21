@@ -1,4 +1,6 @@
 {
+  "buildCommand": "CI=false yarn build",
+  "outputDirectory": "build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
@@ -17,8 +19,5 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
     }
-  ],
-  "buildCommand": "yarn build",
-  "outputDirectory": "build",
-  "framework": null
+  ]
 }

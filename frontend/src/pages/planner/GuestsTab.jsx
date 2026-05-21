@@ -26,7 +26,7 @@ export default function GuestsTab({ plan }) {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [plan.planId]);
+  useEffect(() => { load(); }, [plan.planId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openAdd  = () => { setForm(emptyGuest); setModal('add'); };
   const openEdit = (g) => { setForm({

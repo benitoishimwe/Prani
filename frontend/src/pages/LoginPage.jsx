@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useLang } from '../contexts/LanguageContext';
+import { useLang, LANGUAGES } from '../contexts/LanguageContext';
 import { authAPI } from '../services/api';
-import { Eye, EyeOff, Loader, Globe, Sparkles, Calendar, Users } from 'lucide-react';
+import { Eye, EyeOff, Loader, Globe, Sparkles, Calendar, Users, MapPin, Briefcase, Heart, Building2 } from 'lucide-react';
+
+const REGISTER_ROLES = [
+  { value: 'client',        label: 'Couple / Client',    icon: Heart,      desc: 'Planning your own event' },
+  { value: 'vendor',        label: 'Vendor / Supplier',  icon: Briefcase,  desc: 'Offer services to planners' },
+  { value: 'event_manager', label: 'Event Planner',      icon: Building2,  desc: 'Manage events for clients' },
+];
 
 const ROLE_PATHS = {
   super_admin:   '/super-admin',
@@ -20,7 +26,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const [tab, setTab] = useState('login');
-  const [form, setForm] = useState({ email: '', password: '', name: '' });
+  const [form, setForm] = useState({ email: '', password: '', name: '', role: 'client' });
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,18 +35,13 @@ export default function LoginPage() {
   const [mfaCode, setMfaCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
 
-  const handleGoogleLogin = () => {
-    const redirectUrl = window.location.origin + '/auth/callback';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       if (tab === 'register') {
-        const res = await authAPI.register(form);
+        const res = await authAPI.register({ email: form.email, password: form.password, name: form.name, role: form.role });
         const payload = res.data;
         login(payload.user, payload.token);
         navigate(ROLE_PATHS[payload.user.role] ?? '/dashboard');
@@ -99,36 +100,52 @@ export default function LoginPage() {
           alt="African wedding celebration"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0" style={{background:'linear-gradient(135deg, rgba(15,76,92,0.85) 0%, rgba(15,76,92,0.5) 100%)'}} />
+        {/* Multi-layer gradient matching landing hero */}
+        <div className="absolute inset-0" style={{background:'linear-gradient(160deg, rgba(15,76,92,0.92) 0%, rgba(15,76,92,0.75) 50%, rgba(10,54,66,0.88) 100%)'}} />
+        {/* Decorative glow accent */}
+        <div className="absolute top-1/3 -right-20 w-96 h-96 rounded-full opacity-10" style={{background:'radial-gradient(circle, #E67E22 0%, transparent 70%)'}} />
+
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
-          {/* Top logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <span className="text-white font-bold text-lg" style={{fontFamily:'Poppins,sans-serif'}}>P</span>
+          {/* Top logo + badge */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center border border-white/20">
+                <span className="text-white font-bold text-lg" style={{fontFamily:'Poppins,sans-serif'}}>P</span>
+              </div>
+              <span className="text-xl font-bold" style={{fontFamily:'Poppins,sans-serif'}}>Prani</span>
             </div>
-            <span className="text-xl font-bold" style={{fontFamily:'Poppins,sans-serif'}}>Prani</span>
+            <span className="text-xs bg-white/10 border border-white/20 backdrop-blur px-3 py-1.5 rounded-full text-white/80">
+              AI-powered event planning
+            </span>
           </div>
 
           {/* Bottom content */}
           <div>
             <h1 className="text-5xl font-bold mb-4 leading-tight" style={{fontFamily:'Poppins,sans-serif'}}>
-              Plan with confidence<br />the African way.
+              Plan with{' '}
+              <span style={{color:'#E67E22'}}>confidence,</span>
+              <br />your way.
             </h1>
-            <p className="text-lg text-white/80 mb-8">
-              AI-powered event planning for African businesses. Weddings, corporate events, and more — all in one platform.
+            <p className="text-base text-white/75 mb-10 leading-relaxed max-w-sm">
+              Prani is the all-in-one platform for event planning businesses — from intimate weddings to large-scale corporate conferences, anywhere in the world.
             </p>
-            <div className="flex gap-8">
+
+            {/* Stats grid — 2×2 on narrow, row on wide */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               {[
-                { icon: Calendar, n: '500+', l: 'Events Managed' },
-                { icon: Users, n: '1,200+', l: 'Happy Clients' },
-                { icon: Sparkles, n: '98%', l: 'AI Accuracy' },
+                { icon: Calendar,  n: '500+',   l: 'Events Managed' },
+                { icon: Users,     n: '1,200+', l: 'Happy Clients'  },
+                { icon: Sparkles,  n: '98%',    l: 'AI Accuracy'    },
+                { icon: MapPin,    n: '20+',    l: 'Countries'      },
               ].map(({ icon: Icon, n, l }) => (
-                <div key={l} className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Icon size={16} className="text-[#E67E22]" />
-                    <p className="text-2xl font-bold text-[#E6C975]">{n}</p>
+                <div key={l} className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:'rgba(230,126,34,0.18)'}}>
+                    <Icon size={16} style={{color:'#E67E22'}} />
                   </div>
-                  <p className="text-sm text-white/60">{l}</p>
+                  <div>
+                    <p className="text-xl font-bold leading-none" style={{color:'#E6C975'}}>{n}</p>
+                    <p className="text-xs text-white/60 mt-0.5">{l}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -150,14 +167,19 @@ export default function LoginPage() {
           {/* Language Toggle */}
           <div className="flex justify-between items-center mb-4">
             <Link to="/" className="text-sm text-[#0F4C5C] hover:underline font-medium">← Back to home</Link>
-            <button
-              onClick={() => switchLang(lang === 'en' ? 'rw' : 'en')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-[#E5E7EB] text-sm text-[#6B7280] hover:border-[#0F4C5C] transition-colors"
-              data-testid="lang-toggle-login"
-            >
-              <Globe size={14} />
-              {lang === 'en' ? 'Kinyarwanda' : 'English'}
-            </button>
+            <div className="relative">
+              <select
+                value={lang}
+                onChange={e => switchLang(e.target.value)}
+                data-testid="lang-toggle-login"
+                className="appearance-none flex items-center gap-2 pl-3 pr-7 py-1.5 rounded-full bg-white border border-[#E5E7EB] text-sm text-[#6B7280] hover:border-[#0F4C5C] transition-colors cursor-pointer focus:outline-none focus:border-[#0F4C5C]"
+              >
+                {LANGUAGES.map(({ code, flag, label }) => (
+                  <option key={code} value={code}>{flag} {label}</option>
+                ))}
+              </select>
+              <Globe size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] pointer-events-none" />
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-8">
@@ -190,17 +212,45 @@ export default function LoginPage() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {tab === 'register' && (
-                    <div>
-                      <label className="block text-sm font-medium text-[#111827] mb-1.5">{t('auth.name')}</label>
-                      <input
-                        className="input-wedding"
-                        placeholder="Amina Uwase"
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        required
-                        data-testid="register-name"
-                      />
-                    </div>
+                    <>
+                      {/* Role selector */}
+                      <div>
+                        <label className="block text-sm font-medium text-[#111827] mb-2">I am a…</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {REGISTER_ROLES.map(({ value, label, icon: Icon, desc }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setForm({ ...form, role: value })}
+                              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-center transition-all ${
+                                form.role === value
+                                  ? 'border-[#0F4C5C] bg-[#E8F4F8] text-[#0F4C5C]'
+                                  : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#0F4C5C]'
+                              }`}
+                              data-testid={`role-${value}`}
+                            >
+                              <Icon size={18} className={form.role === value ? 'text-[#0F4C5C]' : 'text-[#9CA3AF]'} />
+                              <span className="text-xs font-semibold leading-tight">{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-[#6B7280] mt-1.5 text-center">
+                          {REGISTER_ROLES.find(r => r.value === form.role)?.desc}
+                        </p>
+                      </div>
+                      {/* Full name */}
+                      <div>
+                        <label className="block text-sm font-medium text-[#111827] mb-1.5">{t('auth.name')}</label>
+                        <input
+                          className="input-wedding"
+                          placeholder="Amina Uwase"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          required
+                          data-testid="register-name"
+                        />
+                      </div>
+                    </>
                   )}
                   <div>
                     <label className="block text-sm font-medium text-[#111827] mb-1.5">{t('auth.email')}</label>
@@ -215,14 +265,20 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[#111827] mb-1.5">{t('auth.password')}</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-medium text-[#111827]">{t('auth.password')}</label>
+                      {tab === 'login' && (
+                        <span className="text-xs text-[#0F4C5C] hover:underline cursor-pointer font-medium">Forgot password?</span>
+                      )}
+                    </div>
                     <div className="relative">
                       <input
                         className="input-wedding pr-10"
                         type={showPwd ? 'text' : 'password'}
-                        placeholder="••••••••"
+                        placeholder={tab === 'register' ? 'Min. 8 characters' : '••••••••'}
                         value={form.password}
                         onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        minLength={tab === 'register' ? 8 : undefined}
                         required
                         data-testid="login-password"
                       />
@@ -250,26 +306,6 @@ export default function LoginPage() {
                     {tab === 'login' ? t('auth.login') : t('auth.register')}
                   </button>
                 </form>
-
-                <div className="flex items-center gap-3 my-5">
-                  <div className="flex-1 h-px bg-[#E5E7EB]" />
-                  <span className="text-xs text-[#6B7280]">{t('auth.or')}</span>
-                  <div className="flex-1 h-px bg-[#E5E7EB]" />
-                </div>
-
-                <button
-                  onClick={handleGoogleLogin}
-                  className="w-full h-12 flex items-center justify-center gap-3 rounded-xl border-2 border-[#E5E7EB] text-[#111827] font-medium text-sm hover:border-[#0F4C5C] hover:bg-[#E8F4F8] transition-all"
-                  data-testid="google-login-btn"
-                >
-                  <svg viewBox="0 0 24 24" className="w-5 h-5">
-                    <path fill="#4285F4" d="M23.745 12.27c0-.79-.07-1.54-.19-2.27h-11.3v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
-                    <path fill="#34A853" d="M12.255 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-3.98v3.09C3.515 21.3 7.615 24 12.255 24z"/>
-                    <path fill="#FBBC05" d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62h-3.98a11.86 11.86 0 000 10.76l3.98-3.09z"/>
-                    <path fill="#EA4335" d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0c-4.64 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"/>
-                  </svg>
-                  {t('auth.google_login')}
-                </button>
 
                 {tab === 'register' && (
                   <p className="text-xs text-[#6B7280] text-center mt-4">

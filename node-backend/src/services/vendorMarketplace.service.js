@@ -18,8 +18,8 @@ const { AppError } = require('../middleware/errorHandler');
 async function browseVendors({ category, search, minPrice, maxPrice, page = 1, size = 20 } = {}) {
   const skip = (page - 1) * size;
 
-  // Query the vendors table directly — no VendorProfile record required
-  const where = { isActive: true };
+  // Show vendors approved by admin
+  const where = { isActive: true, approvedByAdmin: true };
   if (category) where.category = category;
   if (search) {
     where.OR = [
@@ -80,10 +80,20 @@ async function getVendorPublicProfile(vendorId) {
     },
   });
 
-  if (!vendor || !vendor.isActive) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
-  if (!vendor.profile || !vendor.profile.isMarketplaceActive) {
+  if (!vendor || !vendor.isActive || !vendor.approvedByAdmin) {
     throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
   }
+
+  // Increment view count asynchronously
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  Promise.all([
+    prisma.vendor.update({ where: { vendorId }, data: { viewCount: { increment: 1 } } }),
+    prisma.vendorAnalytics.upsert({
+      where: { vendorId_date: { vendorId, date: today } },
+      create: { vendorId, date: today, views: 1 },
+      update: { views: { increment: 1 } },
+    }),
+  ]).catch(() => {});
 
   const agg = await prisma.vendorReview.aggregate({
     where: { vendorId },
@@ -159,15 +169,19 @@ async function createReview({ vendorId, userId, eventId, rating, title, body }) 
       },
     });
 
-    // Recalculate and persist average rating on the vendor
+    // Recalculate and persist average rating + count on the vendor
     const agg = await tx.vendorReview.aggregate({
       where: { vendorId },
       _avg: { rating: true },
+      _count: { reviewId: true },
     });
 
     await tx.vendor.update({
       where: { vendorId },
-      data: { rating: agg._avg.rating ? Number(agg._avg.rating.toFixed(2)) : 0 },
+      data: {
+        rating: agg._avg.rating ? Number(agg._avg.rating.toFixed(2)) : 0,
+        ratingCount: agg._count.reviewId,
+      },
     });
 
     return created;
@@ -191,7 +205,7 @@ async function createInquiry({ vendorId, userId, eventId, message, budget, event
   const vendor = await prisma.vendor.findUnique({ where: { vendorId } });
   if (!vendor || !vendor.isActive) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
 
-  return prisma.vendorInquiry.create({
+  const inquiry = await prisma.vendorInquiry.create({
     data: {
       vendorId,
       userId,
@@ -201,6 +215,16 @@ async function createInquiry({ vendorId, userId, eventId, message, budget, event
       eventDate: eventDate ? new Date(eventDate) : null,
     },
   });
+
+  // Track in daily analytics (non-blocking)
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  prisma.vendorAnalytics.upsert({
+    where: { vendorId_date: { vendorId, date: today } },
+    create: { vendorId, date: today, inquiries: 1 },
+    update: { inquiries: { increment: 1 } },
+  }).catch(() => {});
+
+  return inquiry;
 }
 
 /**
@@ -249,10 +273,21 @@ async function toggleFavorite({ userId, vendorId }) {
 
   if (existing) {
     await prisma.vendorFavorite.delete({ where: { favoriteId: existing.favoriteId } });
+    prisma.vendor.update({ where: { vendorId }, data: { likeCount: { decrement: 1 } } }).catch(() => {});
     return { favorited: false };
   }
 
   await prisma.vendorFavorite.create({ data: { userId, vendorId } });
+  prisma.vendor.update({ where: { vendorId }, data: { likeCount: { increment: 1 } } }).catch(() => {});
+
+  // Track in daily analytics
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  prisma.vendorAnalytics.upsert({
+    where: { vendorId_date: { vendorId, date: today } },
+    create: { vendorId, date: today, likes: 1 },
+    update: { likes: { increment: 1 } },
+  }).catch(() => {});
+
   return { favorited: true };
 }
 

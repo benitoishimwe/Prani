@@ -48,6 +48,66 @@ router.get('/shifts/all', authenticate, async (req, res, next) => {
   }
 });
 
+// ─── GET /stats — staff on duty today ────────────────────────────────────────
+// NOTE: declared before /:staffId to avoid param collision
+router.get('/stats', authenticate, async (req, res, next) => {
+  try {
+    const prisma = require('../config/prisma');
+    const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
+
+    // Total active staff in tenant
+    const totalStaff = await prisma.user.count({
+      where: {
+        ...(tenantId ? { tenantId } : {}),
+        role: { in: ['staff', 'event_manager'] },
+        isActive: true,
+      },
+    });
+
+    // Use raw SQL — date column is TEXT and may contain ISO or DD/MM/YYYY strings
+    const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const todayRows = tenantId
+      ? await prisma.$queryRawUnsafe(
+          `SELECT DISTINCT staff_id FROM shifts
+           WHERE tenant_id::text = $1
+             AND staff_id IS NOT NULL
+             AND date IS NOT NULL
+             AND (
+               CASE
+                 WHEN date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                 THEN SUBSTRING(date FROM 1 FOR 10) = $2
+                 WHEN date ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'
+                 THEN TO_DATE(SUBSTRING(date FROM 1 FOR 10), 'DD/MM/YYYY')::text = $2
+                 ELSE FALSE
+               END
+             )`,
+          tenantId, today
+        )
+      : await prisma.$queryRawUnsafe(
+          `SELECT DISTINCT staff_id FROM shifts
+           WHERE staff_id IS NOT NULL
+             AND date IS NOT NULL
+             AND (
+               CASE
+                 WHEN date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                 THEN SUBSTRING(date FROM 1 FOR 10) = $1
+                 WHEN date ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'
+                 THEN TO_DATE(SUBSTRING(date FROM 1 FOR 10), 'DD/MM/YYYY')::text = $1
+                 ELSE FALSE
+               END
+             )`,
+          today
+        );
+
+    const onDuty      = todayRows.length;
+    const utilization = totalStaff > 0 ? Math.round((onDuty / totalStaff) * 100) : 0;
+
+    return R.ok(res, { total: onDuty, utilization, totalStaff });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /shifts — create shift ─────────────────────────────────────────────
 // NOTE: declared before /:staffId/shifts to avoid param collision
 router.post(
@@ -124,7 +184,6 @@ router.get('/events/:eventId/shifts', authenticate, async (req, res, next) => {
 router.get('/me/shifts', authenticate, async (req, res, next) => {
   try {
     const { userId, tenantId } = req.user;
-    if (!tenantId) return R.badRequest(res, 'Tenant context required');
     const data = await staffService.getMyShifts(userId, tenantId);
     return R.ok(res, data);
   } catch (err) {

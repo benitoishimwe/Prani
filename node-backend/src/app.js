@@ -55,6 +55,23 @@ app.use(
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// ── Strip null bytes (0x00) from all string fields in request bodies ─────────
+// PostgreSQL text columns reject null bytes with error code 22021.
+function stripNullBytes(value) {
+  if (typeof value === 'string') return value.split(String.fromCharCode(0)).join('');
+  if (Array.isArray(value))     return value.map(stripNullBytes);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const k of Object.keys(value)) out[k] = stripNullBytes(value[k]);
+    return out;
+  }
+  return value;
+}
+app.use((req, _res, next) => {
+  if (req.body) req.body = stripNullBytes(req.body);
+  next();
+});
+
 // ── Static files ─────────────────────────────────────────────────────────────
 const publicDir = path.resolve(config.publicDir);
 if (!fs.existsSync(publicDir)) {

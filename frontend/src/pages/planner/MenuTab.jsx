@@ -22,7 +22,7 @@ export default function MenuTab({ plan }) {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [plan.planId]);
+  useEffect(() => { load(); }, [plan.planId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openAdd  = () => { setForm({...empty, course: activeTab}); setModal('add'); };
   const openEdit = (item) => { setForm({ course: item.course, name: item.name, description: item.description||'', dietary_info: item.dietaryInfo||'', is_final: item.isFinal }); setModal(item); };

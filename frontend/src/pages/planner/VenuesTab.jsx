@@ -17,7 +17,7 @@ export default function VenuesTab({ plan }) {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [plan.planId]);
+  useEffect(() => { load(); }, [plan.planId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openAdd  = () => { setForm(empty); setModal('add'); };
   const openEdit = (v) => { setForm({

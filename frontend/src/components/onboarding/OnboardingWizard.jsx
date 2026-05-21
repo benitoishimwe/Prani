@@ -65,16 +65,21 @@ export default function OnboardingWizard({ onClose, onComplete }) {
                 password: formData.password,
                 role: formData.role,
             });
-            const userId = createRes.data.userId || createRes.data.user_id;
+            // Route returns { data: user, message: '...' } so user is nested under .data.data
+            const user = createRes.data?.data || createRes.data;
+            const userId = user?.userId || user?.user_id;
+            if (!userId) throw new Error('User created but ID not returned from server');
 
-            await adminAPI.updateUser(userId, {
-                skills: formData.skills,
-                availability: formData.availability,
-            });
+            if (formData.skills || formData.availability) {
+                await adminAPI.updateUser(userId, {
+                    skills: formData.skills,
+                    availability: formData.availability,
+                });
+            }
 
             onComplete();
         } catch (err) {
-            setError(err.response?.data?.message || err.response?.data?.detail || 'Failed to onboard staff');
+            setError(err.response?.data?.message || err.response?.data?.detail || err.message || 'Failed to onboard staff');
         } finally {
             setLoading(false);
         }

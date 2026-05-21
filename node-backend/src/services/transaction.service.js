@@ -9,6 +9,31 @@ function tenantScope(tenantId) {
   return tenantId ? { tenantId } : {};
 }
 
+/** Remove null bytes and other control characters that PostgreSQL rejects in UTF-8 text columns. */
+function clean(s) {
+  if (s === null || s === undefined) return s;
+  if (Array.isArray(s)) return s.map(clean);
+  const str = String(s);
+  // Strip null bytes and control chars; preserve \t (0x09), \n (0x0A), \r (0x0D)
+  return str.replace(/\0/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+}
+
+/**
+ * Parse a date value safely: strips invisible/control characters, validates, returns
+ * a JavaScript Date or null. Prevents PostgreSQL UTF-8 encoding errors from date fields.
+ */
+function parseDate(value) {
+  if (!value) return null;
+  // Strip null bytes, control chars, and invisible Unicode (zero-width, narrow no-break space, etc.)
+  const sanitized = String(value)
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    .replace(/[​-‍ ⁠﻿]/g, '')
+    .trim();
+  if (!sanitized) return null;
+  const d = new Date(sanitized);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 /**
  * Compute the inventory counter deltas for a given transaction type.
  * Returns { available, rented, washing, quantity } — only the fields that change.
@@ -141,7 +166,7 @@ async function createTransaction({
   staffName,
   quantity,
   photo,
-  returnDate,
+  daysToReturn,
 }) {
   const qty = Number(quantity) || 1;
 
@@ -190,22 +215,44 @@ async function createTransaction({
     // Create transaction record
     return tx.transaction.create({
       data: {
-        tenantId: tenantId || item.tenantId,
-        type,
-        itemId,
-        itemName: item.name,
-        eventId: eventId || null,
-        eventName: eventName || null,
-        staffId: staffId || null,
-        staffName: staffName || null,
+        tenantId: clean(tenantId || item.tenantId),
+        type: clean(type),
+        itemId: clean(itemId),
+        itemName: clean(item.name),
+        eventId: eventId ? clean(eventId) : null,
+        eventName: eventName ? clean(eventName) : null,
+        staffId: clean(staffId),
+        staffName: staffName ? clean(staffName) : null,
         quantity: qty,
-        photo: photo || null,
-        returnDate: returnDate ? new Date(returnDate) : null,
+        photo: photo ? clean(photo) : null,
+        daysToReturn: daysToReturn ? parseInt(daysToReturn, 10) : null,
       },
     });
   });
 
   return result;
+}
+
+/**
+ * Update safe metadata fields on a transaction (does not touch inventory counters).
+ * Editable: returnDate, eventId, eventName, staffName.
+ *
+ * @param {string} transactionId
+ * @param {string|null} tenantId
+ * @param {object} fields
+ */
+async function updateTransaction(transactionId, tenantId, { daysToReturn, eventId, eventName, staffName }) {
+  const existing = await prisma.transaction.findUnique({ where: { transactionId } });
+  if (!existing) throw new AppError('Transaction not found', 404, 'TRANSACTION_NOT_FOUND');
+  if (tenantId && existing.tenantId !== tenantId) throw new AppError('Transaction not found', 404, 'TRANSACTION_NOT_FOUND');
+
+  const data = {};
+  if (daysToReturn !== undefined) data.daysToReturn = daysToReturn ? parseInt(daysToReturn, 10) : null;
+  if (eventId      !== undefined) data.eventId      = eventId    ? clean(eventId)    : null;
+  if (eventName    !== undefined) data.eventName    = eventName  ? clean(eventName)  : null;
+  if (staffName    !== undefined) data.staffName    = staffName  ? clean(staffName)  : null;
+
+  return prisma.transaction.update({ where: { transactionId }, data });
 }
 
 /**
@@ -237,5 +284,6 @@ module.exports = {
   listTransactions,
   getTransactionById,
   createTransaction,
+  updateTransaction,
   getTransactionStats,
 };

@@ -2,11 +2,15 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const { randomUUID } = require('crypto');
 const { authenticate } = require('../middleware/auth');
 const { requireRole, Roles } = require('../middleware/rbac');
 const { ok, badRequest, notFound } = require('../utils/response');
 const adminService = require('../services/admin.service');
 const impersonationService = require('../services/impersonation.service');
+const invitationService = require('../services/invitation.service');
+const emailService = require('../services/email.service');
+const auditService = require('../services/audit.service');
 const prisma = require('../config/prisma');
 
 const router = express.Router();
@@ -51,12 +55,26 @@ router.get('/users/:userId', ...isAdmin, async (req, res, next) => {
 });
 
 // ─── POST /api/admin/users/:userId/deactivate ─────────────────────────────────
-// Deactivate a user account.
 router.post('/users/:userId/deactivate', ...isAdmin, async (req, res, next) => {
   try {
     const user = await adminService.deactivateUser(req.params.userId);
     return ok(res, user, 'User has been deactivated');
   } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /api/admin/users/:userId/activate ───────────────────────────────────
+router.post('/users/:userId/activate', ...isAdmin, async (req, res, next) => {
+  try {
+    const user = await prisma.user.update({
+      where: { userId: req.params.userId },
+      data: { isActive: true },
+      select: { userId: true, email: true, name: true, role: true, isActive: true },
+    });
+    return ok(res, user, 'User has been activated');
+  } catch (err) {
+    if (err.code === 'P2025') return notFound(res, 'User not found');
     return next(err);
   }
 });
@@ -115,9 +133,11 @@ router.post('/users', ...isAdmin, async (req, res, next) => {
 
 // ─── PUT /api/admin/users/:userId ─────────────────────────────────────────────
 // Update a user's profile or role.
+// When role is set to "vendor", auto-creates a Vendor record (if none exists for that email)
+// so the vendor portal shows a usable profile immediately.
 router.put('/users/:userId', ...isAdmin, async (req, res, next) => {
   try {
-    const { name, role, skills, availability, certifications } = req.body;
+    const { name, role, skills, availability, certifications, vendorCategory } = req.body;
     const mappedRole = role === 'admin' ? 'tenant_admin' : role;
 
     const updateData = {};
@@ -133,7 +153,225 @@ router.put('/users/:userId', ...isAdmin, async (req, res, next) => {
       select: { userId: true, email: true, name: true, role: true, isActive: true, skills: true, availability: true, tenantId: true, updatedAt: true },
     });
 
+    // Auto-provision a Vendor record when role is set to "vendor"
+    if (mappedRole === 'vendor' && user.email && user.tenantId) {
+      const existing = await prisma.vendor.findFirst({
+        where: { email: user.email, tenantId: user.tenantId },
+      });
+      if (!existing) {
+        const vendor = await prisma.vendor.create({
+          data: {
+            tenantId: user.tenantId,
+            name: user.name || user.email,
+            category: vendorCategory || 'General',
+            email: user.email,
+            contactName: user.name || null,
+          },
+        });
+        // Also create the marketplace profile record
+        await prisma.vendorProfile.create({
+          data: { tenantId: user.tenantId, vendorId: vendor.vendorId },
+        });
+      }
+    }
+
     return ok(res, user, 'User updated successfully');
+  } catch (err) {
+    if (err.code === 'P2025') return notFound(res, 'User not found');
+    return next(err);
+  }
+});
+
+// ─── POST /api/admin/users/:userId/link-vendor ────────────────────────────────
+// Explicitly link a user account to an existing Vendor record by setting the
+// vendor's email to match the user's email.
+router.post('/users/:userId/link-vendor', ...isAdmin, async (req, res, next) => {
+  try {
+    const { vendorId } = req.body;
+    if (!vendorId) return badRequest(res, 'vendorId is required');
+
+    const user = await prisma.user.findUnique({
+      where: { userId: req.params.userId },
+      select: { userId: true, email: true, tenantId: true, name: true },
+    });
+    if (!user) return notFound(res, 'User not found');
+
+    const vendor = await prisma.vendor.findUnique({ where: { vendorId } });
+    if (!vendor) return notFound(res, 'Vendor not found');
+    if (vendor.tenantId !== user.tenantId) return badRequest(res, 'Vendor belongs to a different tenant');
+
+    // Link by setting vendor email to user email
+    await prisma.vendor.update({
+      where: { vendorId },
+      data: { email: user.email, contactName: vendor.contactName || user.name },
+    });
+
+    // Ensure vendor profile exists
+    const profile = await prisma.vendorProfile.findUnique({ where: { vendorId } });
+    if (!profile) {
+      await prisma.vendorProfile.create({ data: { tenantId: vendor.tenantId, vendorId } });
+    }
+
+    // Make sure the user has the vendor role
+    await prisma.user.update({ where: { userId: user.userId }, data: { role: 'vendor' } });
+
+    return ok(res, { linked: true, vendorId }, 'User linked to vendor profile');
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /api/admin/users/invite ─────────────────────────────────────────────
+// Send an invitation email to a new user.
+router.post('/users/invite', ...isAdmin, async (req, res, next) => {
+  try {
+    const { email, role, name } = req.body;
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return badRequest(res, 'email is required');
+    }
+    const VALID_ROLES = ['staff', 'event_manager', 'tenant_admin', 'vendor', 'client'];
+    const assignedRole = role && VALID_ROLES.includes(role) ? role : 'staff';
+    const tenantId = req.user.role === Roles.SUPER_ADMIN
+      ? (req.body.tenantId || req.user.tenantId)
+      : req.user.tenantId;
+    if (!tenantId) return badRequest(res, 'Tenant context required');
+
+    const invitation = await invitationService.createInvitation({
+      tenantId,
+      email: email.trim().toLowerCase(),
+      role: assignedRole,
+      invitedBy: req.user.userId,
+    });
+
+    auditService.log({
+      userId: req.user.userId,
+      userEmail: req.user.email,
+      action: auditService.AuditAction.CREATE,
+      resource: 'invitation',
+      resourceId: invitation.invitationId,
+      details: { inviteeEmail: email, role: assignedRole, name },
+      ipAddress: req.ip,
+    });
+
+    return res.status(201).json({ data: invitation, message: 'Invitation sent successfully' });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /api/admin/users/:userId/resend-invite ───────────────────────────────
+// Revoke the existing pending invitation (if any) and send a new one.
+router.post('/users/:userId/resend-invite', ...isAdmin, async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { userId: req.params.userId },
+      select: { userId: true, email: true, tenantId: true, name: true },
+    });
+    if (!user) return notFound(res, 'User not found');
+
+    const tenantId = req.user.role === Roles.SUPER_ADMIN ? (user.tenantId || req.user.tenantId) : req.user.tenantId;
+
+    // Revoke any existing pending invitation for this email+tenant
+    const pending = await prisma.tenantInvitation.findFirst({
+      where: { email: user.email, tenantId, acceptedAt: null, expiresAt: { gt: new Date() } },
+    });
+    if (pending) {
+      await prisma.tenantInvitation.delete({ where: { invitationId: pending.invitationId } });
+    }
+
+    const invitation = await invitationService.createInvitation({
+      tenantId,
+      email: user.email,
+      role: user.role || 'staff',
+      invitedBy: req.user.userId,
+    });
+
+    return ok(res, invitation, 'Invitation resent successfully');
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /api/admin/users/:userId/reset-password ─────────────────────────────
+// Generate a temporary password, update the user, and email it to them.
+router.post('/users/:userId/reset-password', ...isAdmin, async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { userId: req.params.userId },
+      select: { userId: true, email: true, name: true, tenantId: true },
+    });
+    if (!user) return notFound(res, 'User not found');
+
+    // Scope check: tenant_admin can only reset users in their own tenant
+    if (req.user.role !== Roles.SUPER_ADMIN && user.tenantId !== req.user.tenantId) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Access denied' });
+    }
+
+    const tempPassword = randomUUID().replace(/-/g, '').slice(0, 12);
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    await prisma.user.update({
+      where: { userId: user.userId },
+      data: { passwordHash },
+    });
+
+    // Send notification email (fire-and-forget)
+    emailService.sendPasswordReset(user.email, user.name, tempPassword).catch((err) => {
+      console.error('[admin] Failed to send password reset email:', err.message);
+    });
+
+    auditService.log({
+      userId: req.user.userId,
+      userEmail: req.user.email,
+      action: auditService.AuditAction.PASSWORD_CHANGE,
+      resource: auditService.AuditResource.USER,
+      resourceId: user.userId,
+      details: { initiatedBy: 'admin', targetEmail: user.email },
+      ipAddress: req.ip,
+    });
+
+    return ok(res, { email: user.email }, 'Temporary password sent to user\'s email');
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── PATCH /api/admin/users/:userId/role ──────────────────────────────────────
+// Change a user's role with audit logging.
+router.patch('/users/:userId/role', ...isAdmin, async (req, res, next) => {
+  try {
+    const { role } = req.body;
+    const VALID_ROLES = ['staff', 'event_manager', 'tenant_admin', 'vendor', 'client'];
+    if (!role || !VALID_ROLES.includes(role)) {
+      return badRequest(res, `role must be one of: ${VALID_ROLES.join(', ')}`);
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { userId: req.params.userId },
+      select: { userId: true, role: true, tenantId: true, email: true, name: true },
+    });
+    if (!existing) return notFound(res, 'User not found');
+    if (req.user.role !== Roles.SUPER_ADMIN && existing.tenantId !== req.user.tenantId) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Access denied' });
+    }
+
+    const user = await prisma.user.update({
+      where: { userId: req.params.userId },
+      data: { role },
+      select: { userId: true, email: true, name: true, role: true, isActive: true, tenantId: true },
+    });
+
+    auditService.log({
+      userId: req.user.userId,
+      userEmail: req.user.email,
+      action: auditService.AuditAction.UPDATE,
+      resource: auditService.AuditResource.USER,
+      resourceId: user.userId,
+      details: { previousRole: existing.role, newRole: role, targetEmail: user.email },
+      ipAddress: req.ip,
+    });
+
+    return ok(res, user, `Role updated to ${role}`);
   } catch (err) {
     if (err.code === 'P2025') return notFound(res, 'User not found');
     return next(err);

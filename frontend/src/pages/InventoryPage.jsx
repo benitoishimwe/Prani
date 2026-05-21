@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLang } from '../contexts/LanguageContext';
-import { inventoryAPI } from '../services/api';
+import { inventoryAPI, transactionAPI } from '../services/api';
 import {
   Plus, Search, QrCode, Package, RefreshCw, Loader,
-  Edit2, X, Download, Printer,
+  Edit2, X, Download, Printer, Zap,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const CONDITION_COLOR = {
   good:        { badge: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
@@ -13,6 +14,143 @@ const CONDITION_COLOR = {
   maintenance: { badge: 'bg-red-50 text-red-700',        dot: 'bg-red-500'     },
   excellent:   { badge: 'bg-teal-50 text-teal-700',      dot: 'bg-teal-500'    },
 };
+
+// ── Quick action config ──────────────────────────────────────────────────────
+const QUICK_ACTIONS = [
+  { type: 'rent',            label: 'Rent',    bg: 'bg-orange-50',  text: 'text-orange-600',  hover: 'hover:bg-orange-100',  available: (i) => i.available > 0 },
+  { type: 'return',          label: 'Return',  bg: 'bg-emerald-50', text: 'text-emerald-600', hover: 'hover:bg-emerald-100', available: (i) => (i.rented || 0) > 0 },
+  { type: 'wash',            label: 'Wash',    bg: 'bg-blue-50',    text: 'text-blue-600',    hover: 'hover:bg-blue-100',    available: (i) => i.available > 0 },
+  { type: 'return_from_wash',label: 'Unwash',  bg: 'bg-cyan-50',    text: 'text-cyan-600',    hover: 'hover:bg-cyan-100',    available: (i) => (i.washing || 0) > 0 },
+  { type: 'buy',             label: 'Buy',     bg: 'bg-purple-50',  text: 'text-purple-600',  hover: 'hover:bg-purple-100',  available: () => true },
+  { type: 'lost',            label: 'Lost',    bg: 'bg-red-50',     text: 'text-red-600',     hover: 'hover:bg-red-100',     available: (i) => (i.available + (i.rented || 0)) > 0 },
+  { type: 'damage',          label: 'Damage',  bg: 'bg-rose-50',    text: 'text-rose-600',    hover: 'hover:bg-rose-100',    available: (i) => i.available > 0 },
+];
+
+const TX_LABELS = {
+  rent: 'Rent Out', return: 'Return', wash: 'Log Wash',
+  return_from_wash: 'Return from Wash', buy: 'Buy / Add Stock',
+  lost: 'Mark Lost', damage: 'Report Damage',
+};
+
+// ── Quick Transaction Modal ───────────────────────────────────────────────────
+function QuickTransactionModal({ item, txType, onClose, onDone }) {
+  const [quantity,     setQuantity]     = useState(1);
+  const [daysToReturn, setDaysToReturn] = useState('');
+  const [loading,    setLoading]    = useState(false);
+
+  const maxQty = txType === 'return'          ? (item.rented   || 0)
+               : txType === 'return_from_wash' ? (item.washing  || 0)
+               : txType === 'buy'              ? 9999
+               :                                 item.available;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const payload = { type: txType, itemId: item.itemId, quantity: Number(quantity) };
+      if (daysToReturn) payload.daysToReturn = parseInt(daysToReturn, 10);
+      await transactionAPI.create(payload);
+      toast.success(`${TX_LABELS[txType]} recorded`);
+      onDone();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Transaction failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cfg = QUICK_ACTIONS.find(a => a.type === txType) || {};
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        {/* Header */}
+        <div className={`px-5 py-4 flex items-center justify-between ${cfg.bg || 'bg-[#F5F0E8]'}`}>
+          <div>
+            <p className={`font-bold text-sm ${cfg.text || 'text-[#2D2D2D]'}`}>{TX_LABELS[txType]}</p>
+            <p className="text-xs text-[#5C5C5C] mt-0.5 truncate max-w-[220px]">{item.name}</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/70 flex items-center justify-center hover:bg-white">
+            <X size={14} className="text-[#5C5C5C]" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Stock summary */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: 'Available', value: item.available,        color: 'text-emerald-600' },
+              { label: 'Rented',    value: item.rented    || 0,   color: 'text-orange-500'  },
+              { label: 'Washing',   value: item.washing   || 0,   color: 'text-blue-500'    },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="bg-[#F9F9FB] rounded-xl p-2.5 text-center">
+                <p className={`text-lg font-bold ${color}`}>{value}</p>
+                <p className="text-[10px] text-[#9C9C9C] font-medium">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Quantity */}
+          <div>
+            <label className="block text-xs font-semibold text-[#5C5C5C] uppercase tracking-wide mb-1.5">Quantity</label>
+            <input
+              className="input-wedding"
+              type="number"
+              min="1"
+              max={maxQty || undefined}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              required
+            />
+            {maxQty < 9999 && (
+              <p className="text-[10px] text-[#9C9C9C] mt-1">Max: {maxQty}</p>
+            )}
+          </div>
+
+          {/* Return date (rent only) */}
+          {txType === 'rent' && (
+            <div>
+              <label className="block text-xs font-semibold text-[#5C5C5C] uppercase tracking-wide mb-1.5">
+                Days to Return <span className="normal-case font-normal">(optional)</span>
+              </label>
+              <div className="relative">
+                <input
+                  className="input-wedding pr-16"
+                  type="number"
+                  min="1"
+                  max="365"
+                  placeholder="e.g. 7"
+                  value={daysToReturn}
+                  onChange={(e) => setDaysToReturn(e.target.value)}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#9C9C9C]">days</span>
+              </div>
+              {daysToReturn && Number(daysToReturn) > 0 && (
+                <p className="text-xs text-[#C9A84C] mt-1">
+                  Expected: {new Date(Date.now() + Number(daysToReturn) * 86400000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 h-10 rounded-full border-2 border-[#EBE5DB] text-[#5C5C5C] text-sm font-medium hover:border-[#C9A84C]">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || (maxQty < 9999 && Number(quantity) > maxQty)}
+              className="flex-1 btn-gold h-10 flex items-center justify-center gap-1.5 text-sm font-semibold disabled:opacity-50"
+            >
+              {loading ? <Loader size={14} className="animate-spin" /> : <Zap size={14} />}
+              Confirm
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // ── Item Detail Modal ────────────────────────────────────────────────────────
 function ItemDetailModal({ item, onClose, onEdit, onDelete }) {
@@ -319,10 +457,13 @@ function ItemFormModal({ onClose, onSave, editItem = null }) {
 }
 
 // ── Item Card ────────────────────────────────────────────────────────────────
-function ItemCard({ item, onClick }) {
-  const photo = item.photos?.[0];
-  const cond  = CONDITION_COLOR[item.condition] || CONDITION_COLOR.good;
+function ItemCard({ item, onClick, onQuickAction }) {
+  const photo    = item.photos?.[0];
+  const cond     = CONDITION_COLOR[item.condition] || CONDITION_COLOR.good;
   const availPct = item.quantity > 0 ? Math.round((item.available / item.quantity) * 100) : 0;
+
+  // Only show actions that are currently possible for this item
+  const activeActions = QUICK_ACTIONS.filter(a => a.available(item));
 
   return (
     <div
@@ -338,7 +479,6 @@ function ItemCard({ item, onClick }) {
           <Package size={36} className="text-[#C9A84C] opacity-30" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-        {/* condition dot */}
         <span className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${cond.badge}`}>
           {item.condition}
         </span>
@@ -358,34 +498,35 @@ function ItemCard({ item, onClick }) {
         </div>
 
         {/* Stock pills */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-3">
-          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold">
-            {item.available} avail.
-          </span>
-          {item.rented > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 text-[10px] font-semibold">
-              {item.rented} rented
-            </span>
-          )}
-          {item.washing > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold">
-              {item.washing} washing
-            </span>
-          )}
+        <div className="flex items-center gap-1.5 flex-wrap mb-2">
+          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold">{item.available} avail.</span>
+          {item.rented > 0  && <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 text-[10px] font-semibold">{item.rented} rented</span>}
+          {item.washing > 0 && <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold">{item.washing} washing</span>}
         </div>
 
         {/* Availability bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-3">
           <div className="flex-1 h-1.5 bg-[#F5F0E8] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${availPct}%`,
-                background: availPct > 60 ? '#4A7C59' : availPct > 30 ? '#C9A84C' : '#D9534F',
-              }}
-            />
+            <div className="h-full rounded-full transition-all" style={{ width: `${availPct}%`, background: availPct > 60 ? '#4A7C59' : availPct > 30 ? '#C9A84C' : '#D9534F' }} />
           </div>
           <span className="text-[10px] text-[#9C9C9C] font-medium w-8 text-right">{availPct}%</span>
+        </div>
+
+        {/* Quick-action buttons */}
+        <div
+          className="flex flex-wrap gap-1.5 pt-2.5 border-t border-[#F5F0E8]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {activeActions.map(action => (
+            <button
+              key={action.type}
+              type="button"
+              onClick={() => onQuickAction(item, action.type)}
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${action.bg} ${action.text} ${action.hover}`}
+            >
+              {action.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -403,6 +544,7 @@ export default function InventoryPage() {
   const [showAdd, setShowAdd]       = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [editItem, setEditItem]     = useState(null);
+  const [quickTx, setQuickTx]       = useState(null); // { item, txType }
   const [scanning, setScanning]     = useState(false);
   const [scanInput, setScanInput]   = useState('');
 
@@ -419,6 +561,7 @@ export default function InventoryPage() {
     finally { setLoading(false); }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchItems(); }, [search, category]);
 
   const handleDelete = async (item) => {
@@ -510,7 +653,12 @@ export default function InventoryPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map(item => (
-            <ItemCard key={item.itemId} item={item} onClick={() => setDetailItem(item)} />
+            <ItemCard
+              key={item.itemId}
+              item={item}
+              onClick={() => setDetailItem(item)}
+              onQuickAction={(i, type) => setQuickTx({ item: i, txType: type })}
+            />
           ))}
         </div>
       )}
@@ -556,6 +704,16 @@ export default function InventoryPage() {
             setItems(items.map(i => i.itemId === updated.itemId ? updated : i));
             setEditItem(null);
           }}
+        />
+      )}
+
+      {/* Quick transaction modal */}
+      {quickTx && (
+        <QuickTransactionModal
+          item={quickTx.item}
+          txType={quickTx.txType}
+          onClose={() => setQuickTx(null)}
+          onDone={() => { setQuickTx(null); fetchItems(); }}
         />
       )}
     </div>

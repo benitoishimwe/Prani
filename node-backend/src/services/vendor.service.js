@@ -345,6 +345,159 @@ async function updateVendorSelf(userId, updates) {
   });
 }
 
+// ─── Approval workflow ────────────────────────────────────────────────────────
+
+async function approveVendor(vendorId, tenantId) {
+  const vendor = await prisma.vendor.findUnique({ where: { vendorId } });
+  if (!vendor) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
+  if (tenantId && vendor.tenantId !== tenantId) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
+
+  return prisma.vendor.update({
+    where: { vendorId },
+    data: { approvedByAdmin: true, approvedAt: new Date(), rejectedReason: null },
+  });
+}
+
+async function rejectVendor(vendorId, tenantId, reason) {
+  const vendor = await prisma.vendor.findUnique({ where: { vendorId } });
+  if (!vendor) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
+  if (tenantId && vendor.tenantId !== tenantId) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
+
+  return prisma.vendor.update({
+    where: { vendorId },
+    data: { approvedByAdmin: false, isPublic: false, rejectedReason: reason || null },
+  });
+}
+
+async function updateInternalNotes(vendorId, tenantId, notes) {
+  const vendor = await prisma.vendor.findUnique({ where: { vendorId } });
+  if (!vendor) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
+  if (tenantId && vendor.tenantId !== tenantId) throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
+
+  return prisma.vendor.update({ where: { vendorId }, data: { internalNotes: notes || null } });
+}
+
+// ─── Onboarding ───────────────────────────────────────────────────────────────
+
+async function getVendorOnboarding(vendorId) {
+  const onboarding = await prisma.vendorOnboarding.upsert({
+    where: { vendorId },
+    create: { vendorId },
+    update: {},
+  });
+  return onboarding;
+}
+
+async function completeOnboardingStep(vendorId, step) {
+  const VALID = ['stepBio', 'stepPricing', 'stepPhotos', 'stepMarketplaceConsent'];
+  if (!VALID.includes(step)) {
+    throw new AppError(`Invalid step. Must be one of: ${VALID.join(', ')}`, 400, 'INVALID_STEP');
+  }
+
+  const onboarding = await prisma.vendorOnboarding.upsert({
+    where: { vendorId },
+    create: { vendorId, [step]: true },
+    update: { [step]: true },
+  });
+
+  const allDone = onboarding.stepBio && onboarding.stepPricing && onboarding.stepPhotos && onboarding.stepMarketplaceConsent;
+  if (allDone) {
+    await Promise.all([
+      prisma.vendorOnboarding.update({ where: { vendorId }, data: { completedAt: new Date() } }),
+      prisma.vendor.update({ where: { vendorId }, data: { onboardingComplete: true } }),
+    ]);
+  }
+
+  return { ...onboarding, [step]: true, allComplete: allDone };
+}
+
+// ─── Vendor portal (self-service) ────────────────────────────────────────────
+
+async function togglePublicVisibility(userId) {
+  const user = await prisma.user.findUnique({ where: { userId }, select: { email: true, tenantId: true } });
+  if (!user?.email) throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+
+  const vendor = await prisma.vendor.findFirst({
+    where: { email: user.email, isActive: true, ...(user.tenantId ? { tenantId: user.tenantId } : {}) },
+  });
+  if (!vendor) throw new AppError('No vendor profile linked to your account', 404, 'VENDOR_NOT_FOUND');
+  if (!vendor.onboardingComplete) {
+    throw new AppError('Complete your profile before going public', 400, 'ONBOARDING_INCOMPLETE');
+  }
+
+  const updated = await prisma.vendor.update({
+    where: { vendorId: vendor.vendorId },
+    data: { isPublic: !vendor.isPublic },
+  });
+  return { isPublic: updated.isPublic };
+}
+
+async function getVendorPortalAnalytics(userId, days = 30) {
+  const user = await prisma.user.findUnique({ where: { userId }, select: { email: true, tenantId: true } });
+  if (!user?.email) throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+
+  const vendor = await prisma.vendor.findFirst({
+    where: { email: user.email, isActive: true, ...(user.tenantId ? { tenantId: user.tenantId } : {}) },
+    select: { vendorId: true, viewCount: true, likeCount: true, rating: true, ratingCount: true },
+  });
+  if (!vendor) throw new AppError('No vendor profile linked to your account', 404, 'VENDOR_NOT_FOUND');
+
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const daily = await prisma.vendorAnalytics.findMany({
+    where: { vendorId: vendor.vendorId, date: { gte: since } },
+    orderBy: { date: 'asc' },
+  });
+
+  const totals = daily.reduce(
+    (acc, r) => ({ views: acc.views + r.views, likes: acc.likes + r.likes, inquiries: acc.inquiries + r.inquiries }),
+    { views: 0, likes: 0, inquiries: 0 }
+  );
+
+  return {
+    summary: {
+      totalViews: vendor.viewCount,
+      totalLikes: vendor.likeCount,
+      avgRating: vendor.rating ? Number(vendor.rating) : null,
+      totalReviews: vendor.ratingCount,
+    },
+    period: { days, ...totals },
+    daily,
+  };
+}
+
+async function incrementViewCount(vendorId) {
+  try {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    await Promise.all([
+      prisma.vendor.update({ where: { vendorId }, data: { viewCount: { increment: 1 } } }),
+      prisma.vendorAnalytics.upsert({
+        where: { vendorId_date: { vendorId, date: today } },
+        create: { vendorId, date: today, views: 1 },
+        update: { views: { increment: 1 } },
+      }),
+    ]);
+  } catch {} // fire-and-forget
+}
+
+async function markInquiryRead(inquiryId, userId) {
+  const user = await prisma.user.findUnique({ where: { userId }, select: { email: true, tenantId: true } });
+  if (!user?.email) throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+
+  const vendor = await prisma.vendor.findFirst({
+    where: { email: user.email, isActive: true, ...(user.tenantId ? { tenantId: user.tenantId } : {}) },
+  });
+  if (!vendor) throw new AppError('No vendor profile linked to your account', 404, 'VENDOR_NOT_FOUND');
+
+  const inquiry = await prisma.vendorInquiry.findUnique({ where: { inquiryId } });
+  if (!inquiry || inquiry.vendorId !== vendor.vendorId) {
+    throw new AppError('Inquiry not found', 404, 'INQUIRY_NOT_FOUND');
+  }
+
+  return prisma.vendorInquiry.update({ where: { inquiryId }, data: { status: 'read' } });
+}
+
 module.exports = {
   listVendors,
   getVendorById,
@@ -358,4 +511,13 @@ module.exports = {
   updateVendorSelf,
   getVendorReviewsByVendorId,
   getVendorInquiriesByVendorId,
+  approveVendor,
+  rejectVendor,
+  updateInternalNotes,
+  getVendorOnboarding,
+  completeOnboardingStep,
+  togglePublicVisibility,
+  getVendorPortalAnalytics,
+  incrementViewCount,
+  markInquiryRead,
 };

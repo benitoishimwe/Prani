@@ -137,6 +137,61 @@ async function updateTenant(tenantId, updates) {
 }
 
 /**
+ * Permanently delete a tenant and ALL related data.
+ * The tenant must already be deactivated (isActive = false).
+ * The platform root tenant is protected.
+ */
+async function hardDeleteTenant(tenantId) {
+  if (tenantId === PLATFORM_TENANT_ID) {
+    throw new AppError('The platform root tenant cannot be deleted', 403, 'PROTECTED_TENANT');
+  }
+
+  const tenant = await getTenantById(tenantId);
+  if (tenant.isActive) {
+    throw new AppError('Deactivate the tenant before deleting it', 400, 'TENANT_STILL_ACTIVE');
+  }
+
+  // Delete in dependency order to satisfy FK constraints.
+  // deepest children first, then parent tables, then the tenant itself.
+  await prisma.$transaction(async (tx) => {
+    const t = tenantId;
+    // ── Vendor sub-records ─────────────────────────────────────────────────────
+    await tx.$executeRaw`DELETE FROM vendor_reviews   WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM vendor_favorites WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM vendor_inquiries WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM vendor_portfolio WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
+    // ── Album sub-records ──────────────────────────────────────────────────────
+    await tx.$executeRaw`DELETE FROM album_media WHERE album_id IN (SELECT album_id FROM albums WHERE tenant_id = ${t}::uuid)`;
+    // ── Wedding plan sub-records ───────────────────────────────────────────────
+    await tx.$executeRaw`DELETE FROM wedding_budget_items  WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM wedding_guests        WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM wedding_venues        WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM wedding_menu_items    WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM wedding_design_assets WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
+    // ── User sub-records ───────────────────────────────────────────────────────
+    await tx.$executeRaw`DELETE FROM user_sessions WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM email_otps    WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM audit_logs    WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM payments      WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM subscriptions WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
+    // ── Direct tenant-scoped tables ────────────────────────────────────────────
+    await tx.$executeRaw`DELETE FROM vendor_profiles       WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM vendors               WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM albums                WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM save_the_date_designs WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM wedding_plans         WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM event_tasks           WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM transactions          WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM shifts                WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM inventory             WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM events                WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM tenant_invitations    WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM users                 WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM tenants               WHERE tenant_id = ${t}::uuid`;
+  }, { timeout: 30000 });
+}
+
+/**
  * Mark a tenant as inactive. The platform root tenant cannot be deactivated.
  */
 async function deactivateTenant(tenantId) {
@@ -251,6 +306,7 @@ module.exports = {
   createTenant,
   updateTenant,
   deactivateTenant,
+  hardDeleteTenant,
   listTenantUsers,
   createTenantAdmin,
   getPlatformStats,

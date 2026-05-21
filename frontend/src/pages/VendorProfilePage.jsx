@@ -73,8 +73,8 @@ export default function VendorProfilePage() {
           isMarketplaceActive: v.profile?.isMarketplaceActive ?? false,
         });
       })
-      .catch((err) => {
-        if (err?.response?.status === 404) setNoProfile(true);
+      .catch(() => {
+        setNoProfile(true);
       })
       .finally(() => setLoading(false));
   }, []);

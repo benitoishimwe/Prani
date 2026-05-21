@@ -1,21 +1,16 @@
 'use strict';
 
 const prisma = require('../config/prisma');
-const config = require('../config/env');
 const { AppError } = require('../middleware/errorHandler');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const VALID_PLANS = ['free', 'trial', 'pro', 'enterprise', 'starter'];
+const VALID_PLANS = ['free', 'trial', 'pro', 'max', 'enterprise', 'wedding', 'starter'];
+
+const TRIAL_DAYS = 14;
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-/**
- * Find the most recently created active or trial subscription for a user.
- *
- * @param {string} userId
- * @returns {Promise<object|null>}
- */
 async function _findActiveSubscription(userId) {
   return prisma.subscription.findFirst({
     where: {
@@ -28,113 +23,113 @@ async function _findActiveSubscription(userId) {
 
 // ─── Service methods ──────────────────────────────────────────────────────────
 
-/**
- * Create a free-plan subscription for a newly registered user.
- *
- * @param {string} userId
- * @returns {Promise<object>} The created subscription
- */
-async function createFreeSubscription(userId) {
+async function createFreeSubscription(userId, tenantId) {
   return prisma.subscription.create({
     data: {
       userId,
+      tenantId: tenantId || null,
       plan: 'free',
       status: 'active',
     },
   });
 }
 
-/**
- * Get the user's current active or trial subscription.
- *
- * @param {string} userId
- * @returns {Promise<object|null>}
- */
 async function getActiveSubscription(userId) {
   return _findActiveSubscription(userId);
 }
 
-/**
- * Return just the plan name string for a user. Defaults to 'free'.
- *
- * @param {string} userId
- * @returns {Promise<string>}
- */
 async function getCurrentPlan(userId) {
   const subscription = await _findActiveSubscription(userId);
   return subscription ? subscription.plan : 'free';
 }
 
 /**
- * Check whether a specific feature is enabled on the user's current plan.
- *
- * @param {string} userId
- * @param {string} featureKey
- * @returns {Promise<boolean>}
+ * Start a 14-day trial for the user on the given plan.
+ * Cancels any existing active/trial subscription first.
  */
+async function startTrial(userId, plan, tenantId) {
+  if (!['pro', 'max'].includes(plan)) {
+    throw new AppError('Trials are only available for Pro and Max plans', 400, 'INVALID_TRIAL_PLAN');
+  }
+
+  // Check if user already had a trial
+  const existingTrial = await prisma.subscription.findFirst({
+    where: { userId, status: 'trial' },
+  });
+  if (existingTrial) {
+    throw new AppError('You have already used your free trial', 409, 'TRIAL_ALREADY_USED');
+  }
+
+  // Expire any current active subscription
+  await prisma.subscription.updateMany({
+    where: { userId, status: { in: ['active', 'trial'] } },
+    data: { status: 'expired' },
+  });
+
+  const trialEndsAt = new Date();
+  trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+
+  return prisma.subscription.create({
+    data: {
+      userId,
+      tenantId: tenantId || null,
+      plan,
+      status: 'trial',
+      trialEndsAt,
+    },
+  });
+}
+
 async function isFeatureEnabled(userId, featureKey) {
   const plan = await getCurrentPlan(userId);
-
   const feature = await prisma.subscriptionFeature.findFirst({
     where: { plan, featureKey },
   });
-
   return feature ? feature.isEnabled : false;
 }
 
-/**
- * Return the limit value for a feature on the user's plan.
- * Returns null for unlimited, or a number for a capped plan.
- *
- * @param {string} userId
- * @param {string} featureKey
- * @returns {Promise<number|null>}
- */
 async function getFeatureLimit(userId, featureKey) {
   const plan = await getCurrentPlan(userId);
-
   const feature = await prisma.subscriptionFeature.findFirst({
     where: { plan, featureKey },
   });
-
   return feature ? feature.limitValue : null;
 }
 
-/**
- * Return full subscription details including all features for the current plan.
- *
- * @param {string} userId
- * @returns {Promise<{ subscription: object|null, features: object, plan: string }>}
- */
 async function getSubscriptionDetails(userId) {
   const subscription = await _findActiveSubscription(userId);
-  const plan = subscription ? subscription.plan : 'free';
 
-  const featureRows = await prisma.subscriptionFeature.findMany({
-    where: { plan },
-  });
+  // tenants.subscriptionTier is the authoritative plan — fall back to subscription.plan
+  let plan = subscription?.plan || 'free';
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { userId },
+      select: { tenantId: true },
+    });
+    if (user?.tenantId) {
+      const tenant = await prisma.tenant.findUnique({
+        where: { tenantId: user.tenantId },
+        select: { subscriptionTier: true },
+      });
+      if (tenant?.subscriptionTier) plan = tenant.subscriptionTier;
+    }
+  }
 
+  const featureRows = await prisma.subscriptionFeature.findMany({ where: { plan } });
   const features = featureRows.reduce((acc, row) => {
     acc[row.featureKey] = row.isEnabled;
     return acc;
   }, {});
 
-  return { subscription, features, plan };
+  let trialDaysLeft = null;
+  if (subscription?.status === 'trial' && subscription.trialEndsAt) {
+    const diff = new Date(subscription.trialEndsAt) - new Date();
+    trialDaysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  return { subscription, features, plan, trialDaysLeft };
 }
 
-/**
- * Activate or upgrade a subscription for a user (typically called after Stripe payment).
- *
- * @param {object} params
- * @param {string} params.userId
- * @param {string} params.plan
- * @param {string} [params.stripeSubscriptionId]
- * @param {string} [params.stripeCustomerId]
- * @param {Date}   [params.periodStart]
- * @param {Date}   [params.periodEnd]
- * @param {string} [params.tenantId]
- * @returns {Promise<object>} The updated or created subscription
- */
 async function activateSubscription({
   userId,
   plan,
@@ -166,7 +161,7 @@ async function activateSubscription({
 
   if (existing) {
     return prisma.subscription.update({
-      where: { id: existing.id },
+      where: { subscriptionId: existing.subscriptionId },
       data,
     });
   }
@@ -176,36 +171,44 @@ async function activateSubscription({
   });
 }
 
-/**
- * Schedule a subscription for cancellation at the end of the current period.
- *
- * @param {string} userId
- * @returns {Promise<object>} The updated subscription
- */
 async function cancelSubscription(userId) {
   const subscription = await _findActiveSubscription(userId);
   if (!subscription) {
     throw new AppError('No active subscription found', 404, 'SUBSCRIPTION_NOT_FOUND');
   }
 
+  if (subscription.plan === 'free') {
+    throw new AppError('Free plan cannot be cancelled', 400, 'CANNOT_CANCEL_FREE');
+  }
+
   return prisma.subscription.update({
-    where: { id: subscription.id },
+    where: { subscriptionId: subscription.subscriptionId },
     data: { cancelAtPeriodEnd: true },
   });
 }
 
-/**
- * Return all plans with their features, grouped by plan name.
- *
- * @returns {Promise<object>} Map of plan name → { plan, features[] }
- */
+async function resumeSubscription(userId) {
+  const subscription = await prisma.subscription.findFirst({
+    where: { userId, cancelAtPeriodEnd: true, status: { in: ['active', 'trial'] } },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (!subscription) {
+    throw new AppError('No subscription scheduled for cancellation', 404, 'NOT_CANCELLING');
+  }
+
+  return prisma.subscription.update({
+    where: { subscriptionId: subscription.subscriptionId },
+    data: { cancelAtPeriodEnd: false },
+  });
+}
+
 async function getPlansWithFeatures() {
   const allFeatures = await prisma.subscriptionFeature.findMany({
     orderBy: [{ plan: 'asc' }, { featureKey: 'asc' }],
   });
 
   const grouped = {};
-
   for (const plan of VALID_PLANS) {
     grouped[plan] = {
       plan,
@@ -217,25 +220,36 @@ async function getPlansWithFeatures() {
 }
 
 /**
- * Handle incoming Stripe webhook events to keep subscription state in sync.
- *
- * @param {object} params
- * @param {object} params.event   - Stripe event object (type + data.object)
- * @param {Buffer} [params.payload] - Raw request body (for signature verification upstream)
- * @returns {Promise<{ handled: boolean, type: string }>}
+ * Cron: downgrade trials that have expired.
+ * Called daily by the scheduler.
  */
+async function downgradeExpiredTrials() {
+  const now = new Date();
+  const expired = await prisma.subscription.findMany({
+    where: { status: 'trial', trialEndsAt: { lt: now } },
+  });
+
+  for (const sub of expired) {
+    await prisma.subscription.update({
+      where: { subscriptionId: sub.subscriptionId },
+      data: { status: 'expired', plan: 'free' },
+    });
+  }
+
+  return { downgraded: expired.length };
+}
+
 async function handleStripeWebhook({ event }) {
   const { type, data } = event;
   const obj = data.object;
 
   switch (type) {
     case 'checkout.session.completed': {
-      // obj is a Stripe CheckoutSession
-      const customerId = obj.customer;
+      const customerId    = obj.customer;
       const subscriptionId = obj.subscription;
-      const metadata = obj.metadata || {};
-      const userId = metadata.userId;
-      const plan = metadata.plan || 'pro';
+      const metadata      = obj.metadata || {};
+      const userId        = metadata.userId;
+      const plan          = metadata.plan || 'pro';
 
       if (userId) {
         await activateSubscription({
@@ -249,17 +263,14 @@ async function handleStripeWebhook({ event }) {
     }
 
     case 'invoice.payment_failed': {
-      // obj is a Stripe Invoice
       const stripeSubscriptionId = obj.subscription;
-
       if (stripeSubscriptionId) {
         const subscription = await prisma.subscription.findFirst({
           where: { stripeSubscriptionId },
         });
-
         if (subscription) {
           await prisma.subscription.update({
-            where: { id: subscription.id },
+            where: { subscriptionId: subscription.subscriptionId },
             data: { status: 'past_due' },
           });
         }
@@ -268,17 +279,33 @@ async function handleStripeWebhook({ event }) {
     }
 
     case 'customer.subscription.deleted': {
-      // obj is a Stripe Subscription
       const stripeSubscriptionId = obj.id;
-
       const subscription = await prisma.subscription.findFirst({
         where: { stripeSubscriptionId },
       });
-
       if (subscription) {
         await prisma.subscription.update({
-          where: { id: subscription.id },
+          where: { subscriptionId: subscription.subscriptionId },
           data: { status: 'cancelled', cancelAtPeriodEnd: false },
+        });
+      }
+      break;
+    }
+
+    case 'customer.subscription.updated': {
+      const stripeSubscriptionId = obj.id;
+      const subscription = await prisma.subscription.findFirst({
+        where: { stripeSubscriptionId },
+      });
+      if (subscription) {
+        await prisma.subscription.update({
+          where: { subscriptionId: subscription.subscriptionId },
+          data: {
+            cancelAtPeriodEnd: obj.cancel_at_period_end ?? false,
+            currentPeriodEnd: obj.current_period_end
+              ? new Date(obj.current_period_end * 1000)
+              : null,
+          },
         });
       }
       break;
@@ -300,6 +327,9 @@ module.exports = {
   getSubscriptionDetails,
   activateSubscription,
   cancelSubscription,
+  resumeSubscription,
+  startTrial,
+  downgradeExpiredTrials,
   getPlansWithFeatures,
   handleStripeWebhook,
 };

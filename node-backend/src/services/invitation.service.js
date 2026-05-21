@@ -56,7 +56,7 @@ async function createInvitation({ tenantId, email, role, invitedBy }) {
   // Resolve display names for the email
   const [inviter, tenant] = await Promise.all([
     prisma.user.findUnique({ where: { userId: invitedBy }, select: { name: true } }),
-    prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
+    prisma.tenant.findUnique({ where: { tenantId }, select: { name: true } }),
   ]);
 
   const inviterName = inviter?.name || 'A team member';
@@ -69,7 +69,7 @@ async function createInvitation({ tenantId, email, role, invitedBy }) {
       console.error('[invitation.service] Failed to send invitation email:', err.message);
     });
 
-  return invitation;
+  return { ...invitation, invitationLink };
 }
 
 /**
@@ -107,7 +107,7 @@ async function listInvitations(tenantId, { page = 1, size = 20 } = {}) {
  */
 async function revokeInvitation(invitationId, tenantId) {
   const invitation = await prisma.tenantInvitation.findUnique({
-    where: { id: invitationId },
+    where: { invitationId },
   });
 
   if (!invitation) {
@@ -118,7 +118,7 @@ async function revokeInvitation(invitationId, tenantId) {
     throw new AppError('You do not have permission to revoke this invitation', 403, 'FORBIDDEN');
   }
 
-  await prisma.tenantInvitation.delete({ where: { id: invitationId } });
+  await prisma.tenantInvitation.delete({ where: { invitationId } });
 }
 
 module.exports = {

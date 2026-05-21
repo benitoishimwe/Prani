@@ -1,20 +1,30 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import en from '../i18n/en.json';
 import rw from '../i18n/rw.json';
+import fr from '../i18n/fr.json';
+import sw from '../i18n/sw.json';
 
-const translations = { en, rw };
+const translations = { en, rw, fr, sw };
+
+export const LANGUAGES = [
+  { code: 'en', label: 'English',    shortLabel: 'EN', flag: '🇬🇧' },
+  { code: 'rw', label: 'Kinyarwanda', shortLabel: 'RW', flag: '🇷🇼' },
+  { code: 'fr', label: 'Français',   shortLabel: 'FR', flag: '🇫🇷' },
+  { code: 'sw', label: 'Kiswahili',  shortLabel: 'SW', flag: '🇹🇿' },
+];
+
 const LangContext = createContext(null);
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem('prani_lang') || 'en');
+  const [lang, setLang] = useState(() => {
+    const saved = localStorage.getItem('prani_lang');
+    return translations[saved] ? saved : 'en';
+  });
 
   const t = (key) => {
     const keys = key.split('.');
     let val = translations[lang];
-    for (const k of keys) {
-      val = val?.[k];
-    }
-    // Fallback to English
+    for (const k of keys) val = val?.[k];
     if (!val && lang !== 'en') {
       let fallback = translations['en'];
       for (const k of keys) fallback = fallback?.[k];
@@ -24,12 +34,13 @@ export function LanguageProvider({ children }) {
   };
 
   const switchLang = (newLang) => {
+    if (!translations[newLang]) return;
     setLang(newLang);
     localStorage.setItem('prani_lang', newLang);
   };
 
   return (
-    <LangContext.Provider value={{ lang, t, switchLang }}>
+    <LangContext.Provider value={{ lang, t, switchLang, languages: LANGUAGES }}>
       {children}
     </LangContext.Provider>
   );

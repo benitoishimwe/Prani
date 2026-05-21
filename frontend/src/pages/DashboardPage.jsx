@@ -39,15 +39,40 @@ export default function DashboardPage() {
 
   useEffect(() => {
     (async () => {
+      // Sync any unsynced demo shifts from localStorage before fetching stats
+      const todayStr = new Date().toDateString();
+      let demoShifts = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
+      const unsyncedToday = demoShifts.filter(s => s.staffId && s.date && new Date(s.date).toDateString() === todayStr);
+      for (const demo of unsyncedToday) {
+        try {
+          await staffAPI.createShift({
+            staffId: demo.staffId, staffName: demo.staffName ?? null,
+            role: demo.role || '', date: demo.date,
+            startTime: demo.startTime || null, endTime: demo.endTime || null,
+            eventId: demo.eventId || null,
+          });
+          demoShifts = demoShifts.filter(s => s.shiftId !== demo.shiftId);
+          localStorage.setItem('prani_demo_shifts', JSON.stringify(demoShifts));
+        } catch { /* still offline — will retry next time */ }
+      }
+
       const [evRes, invRes, txRes, stRes, recentRes] = await Promise.allSettled([
         eventsAPI.stats(), inventoryAPI.stats(), transactionAPI.stats(), staffAPI.stats(),
         transactionAPI.list({ size: 5 }),
       ]);
+
+      // Also count any remaining unsynced today demo shifts that couldn't be persisted
+      const remainingDemo = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
+      const localOnDuty = new Set(
+        remainingDemo.filter(s => s.staffId && s.date && new Date(s.date).toDateString() === todayStr).map(s => s.staffId)
+      ).size;
+
+      const staffData = stRes.status === 'fulfilled' ? stRes.value.data : {};
       setStats({
         events: evRes.status === 'fulfilled' ? evRes.value.data : {},
         inventory: invRes.status === 'fulfilled' ? invRes.value.data : {},
         transactions: txRes.status === 'fulfilled' ? txRes.value.data : {},
-        staff: stRes.status === 'fulfilled' ? stRes.value.data : {},
+        staff: { ...staffData, total: (staffData.total || 0) + localOnDuty },
       });
       if (recentRes.status === 'fulfilled') {
         setRecentTxs(recentRes.value.data.transactions || []);
@@ -80,7 +105,7 @@ export default function DashboardPage() {
         <StatCard icon={Calendar} label={t('dashboard.total_events')} value={loading ? '…' : (stats.events.total || 0)} sub={`${stats.events.active || 0} active`} color="bg-[#C9A84C]" testId="stat-events" />
         <StatCard icon={Package} label={t('dashboard.inventory_items')} value={loading ? '…' : (stats.inventory.total || 0)} sub={`${stats.inventory.available || 0} available`} color="bg-[#E8A4B8]" testId="stat-inventory" />
         <StatCard icon={ArrowLeftRight} label="Transactions" value={loading ? '…' : (stats.transactions.total || 0)} sub={`${stats.transactions.rent || stats.transactions.rental || 0} rented`} color="bg-[#6B8E9B]" testId="stat-transactions" />
-        <StatCard icon={Users} label={t('dashboard.staff_on_duty')} value={loading ? '…' : (stats.staff.total || 0)} sub={`${stats.staff.utilization || 0}% utilization`} color="bg-[#4A7C59]" testId="stat-staff" />
+        <StatCard icon={Users} label={t('dashboard.staff_on_duty')} value={loading ? '…' : (stats.staff.total || 0)} sub={`${stats.staff.utilization || 0}% utilization · ${stats.staff.totalStaff || 0} total`} color="bg-[#4A7C59]" testId="stat-staff" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

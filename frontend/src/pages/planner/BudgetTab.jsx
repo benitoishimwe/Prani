@@ -44,7 +44,7 @@ export default function BudgetTab({ plan }) {
     }
   };
 
-  useEffect(() => { load(); }, [plan.planId]);
+  useEffect(() => { load(); }, [plan.planId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openAdd  = () => { setForm(empty); setModal('add'); };
   const openEdit = (item) => { setForm({

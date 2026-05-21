@@ -18,6 +18,9 @@ const { createImpersonationToken } = require('../utils/jwt');
 const { log: auditLog, AuditAction, AuditResource } = require('../services/audit.service');
 const tenantService = require('../services/tenant.service');
 const adminService = require('../services/admin.service');
+const invitationService = require('../services/invitation.service');
+
+const emailService = require('../services/email.service');
 
 const router = Router();
 
@@ -61,7 +64,7 @@ const PLANS = [
   },
 ];
 
-const VALID_PLAN_IDS = PLANS.map((p) => p.id);
+const VALID_PLAN_IDS = ['free', 'trial', 'pro', 'max', 'wedding', 'enterprise'];
 
 /** Clamp page to a minimum of 1 so skip never goes negative. */
 function safePage(raw) {
@@ -268,6 +271,29 @@ router.delete('/tenants/:tenantId', async (req, res, next) => {
 });
 
 /**
+ * DELETE /api/super-admin/tenants/:tenantId/hard-delete
+ * Permanently removes the tenant and all its data.
+ * The tenant must already be deactivated (isActive = false).
+ */
+router.delete('/tenants/:tenantId/hard-delete', async (req, res, next) => {
+  try {
+    await tenantService.hardDeleteTenant(req.params.tenantId);
+    auditLog({
+      userId: req.user.userId,
+      userEmail: req.user.email,
+      action: AuditAction.DELETE,
+      resource: AuditResource.TENANT,
+      resourceId: req.params.tenantId,
+      details: { action: 'hard_delete' },
+      ipAddress: req.ip,
+    });
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * DELETE /api/super-admin/tenants/:tenantId/deactivate  (legacy path)
  */
 router.delete('/tenants/:tenantId/deactivate', async (req, res, next) => {
@@ -344,6 +370,83 @@ async function _handleCreateTenantAdmin(req, res, next) {
 
 router.post('/tenants/:tenantId/users', _handleCreateTenantAdmin);
 router.post('/tenants/:tenantId/admins', _handleCreateTenantAdmin);
+
+/**
+ * POST /api/super-admin/tenants/:tenantId/invite
+ * Send an email invitation to join the tenant.
+ * Body: { email, role }
+ */
+router.post('/tenants/:tenantId/invite', async (req, res, next) => {
+  try {
+    const { email, role } = req.body;
+
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'email is required' });
+    }
+    if (!role || typeof role !== 'string') {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'role is required' });
+    }
+
+    const VALID_ROLES = ['staff', 'client', 'vendor', 'event_manager', 'tenant_admin'];
+    if (!VALID_ROLES.includes(role)) {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: `role must be one of: ${VALID_ROLES.join(', ')}`,
+      });
+    }
+
+    // Verify tenant exists
+    const tenant = await prisma.tenant.findUnique({ where: { tenantId: req.params.tenantId } });
+    if (!tenant) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'Tenant not found' });
+    }
+
+    const invitation = await invitationService.createInvitation({
+      tenantId: req.params.tenantId,
+      email: email.trim().toLowerCase(),
+      role,
+      invitedBy: req.user.userId,
+    });
+
+    auditLog({
+      userId: req.user.userId,
+      userEmail: req.user.email,
+      action: AuditAction.CREATE,
+      resource: AuditResource.USER,
+      resourceId: invitation.invitationId,
+      details: { type: 'invitation', email: invitation.email, role, tenantId: req.params.tenantId },
+      ipAddress: req.ip,
+    });
+
+    res.status(201).json({
+      message: `Invitation sent to ${invitation.email}`,
+      invitation: {
+        invitationId: invitation.invitationId,
+        email:        invitation.email,
+        role:         invitation.role,
+        expiresAt:    invitation.expiresAt,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/super-admin/tenants/:tenantId/invitations
+ * List all invitations for a tenant.
+ */
+router.get('/tenants/:tenantId/invitations', async (req, res, next) => {
+  try {
+    const result = await invitationService.listInvitations(req.params.tenantId, {
+      page: safePage(req.query.page),
+      size: Math.max(1, +req.query.size || 20),
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ── User management ───────────────────────────────────────────────────────────
 
@@ -551,6 +654,240 @@ router.patch('/features/:featureId', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/**
+ * POST /api/super-admin/feature-gates
+ * Upsert a feature gate (create or update) for a plan+featureKey combination.
+ */
+router.post('/feature-gates', async (req, res, next) => {
+  try {
+    const { plan, featureKey, isEnabled = true, limitValue } = req.body;
+    if (!plan || !VALID_PLAN_IDS.includes(plan.toLowerCase())) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: `plan must be one of: ${VALID_PLAN_IDS.join(', ')}` });
+    }
+    if (!featureKey || typeof featureKey !== 'string' || !featureKey.trim()) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'featureKey is required' });
+    }
+    const normalizedPlan = plan.toLowerCase();
+    const existing = await prisma.subscriptionFeature.findFirst({
+      where: { plan: normalizedPlan, featureKey: featureKey.trim() },
+    });
+    let feature;
+    if (existing) {
+      feature = await prisma.subscriptionFeature.update({
+        where: { featureId: existing.featureId },
+        data: { isEnabled, ...(limitValue !== undefined && { limitValue }) },
+      });
+    } else {
+      feature = await prisma.subscriptionFeature.create({
+        data: { plan: normalizedPlan, featureKey: featureKey.trim(), isEnabled, limitValue: limitValue ?? null },
+      });
+    }
+    auditLog({
+      userId: req.user.userId, userEmail: req.user.email,
+      action: AuditAction.UPDATE, resource: 'feature_gate', resourceId: feature.featureId,
+      details: { plan: normalizedPlan, featureKey, isEnabled }, ipAddress: req.ip,
+    });
+    res.status(existing ? 200 : 201).json(feature);
+  } catch (err) { next(err); }
+});
+
+/**
+ * DELETE /api/super-admin/feature-gates/:featureId
+ * Remove a DB override, restoring the static PLAN_FEATURES default.
+ */
+router.delete('/feature-gates/:featureId', async (req, res, next) => {
+  try {
+    await prisma.subscriptionFeature.delete({ where: { featureId: req.params.featureId } });
+    auditLog({
+      userId: req.user.userId, userEmail: req.user.email,
+      action: AuditAction.DELETE, resource: 'feature_gate', resourceId: req.params.featureId,
+      details: { action: 'delete_feature_gate' }, ipAddress: req.ip,
+    });
+    res.status(204).send();
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /api/super-admin/feature-matrix
+ * Returns static plan defaults so the frontend can render the full matrix.
+ */
+router.get('/feature-matrix', (_req, res) => {
+  const staticDefaults = {
+    max:        ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+    enterprise: ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+    pro:        ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
+    wedding:    ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'advanced_reports', 'save_the_date_image'],
+    trial:      ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
+    free:       [],
+  };
+  res.json({ static: staticDefaults, plans: VALID_PLAN_IDS });
+});
+
+/**
+ * POST /api/super-admin/tenants/:tenantId/grant-plan
+ * Instantly set any plan for a tenant (no Stripe involved).
+ */
+router.post('/tenants/:tenantId/grant-plan', async (req, res, next) => {
+  try {
+    const { plan } = req.body;
+    if (!plan || !VALID_PLAN_IDS.includes(plan.toLowerCase())) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: `plan must be one of: ${VALID_PLAN_IDS.join(', ')}` });
+    }
+    const normalizedPlan = plan.toLowerCase();
+    const tenantId = req.params.tenantId;
+
+    const tenant = await prisma.tenant.findUnique({ where: { tenantId } });
+    if (!tenant) return res.status(404).json({ error: 'NOT_FOUND', message: 'Tenant not found' });
+
+    const updatedTenant = await prisma.tenant.update({
+      where: { tenantId },
+      data: { subscriptionTier: normalizedPlan, subscriptionStatus: 'active' },
+    });
+
+    // Find tenant admin to own the Subscription record
+    const tenantAdmin = await prisma.user.findFirst({ where: { tenantId, role: 'tenant_admin' } });
+    const subUserId = tenantAdmin?.userId ?? req.user.userId;
+
+    // Find subscription owned by the tenant admin (not just any subscription in the tenant)
+    const existing = await prisma.subscription.findFirst({
+      where: { userId: subUserId },
+      orderBy: { createdAt: 'desc' },
+    });
+    let subscription;
+    if (existing) {
+      subscription = await prisma.subscription.update({
+        where: { subscriptionId: existing.subscriptionId },
+        data: { plan: normalizedPlan, status: 'active', tenantId, trialEndsAt: null, cancelAtPeriodEnd: false },
+      });
+    } else {
+      subscription = await prisma.subscription.create({
+        data: { userId: subUserId, tenantId, plan: normalizedPlan, status: 'active' },
+      });
+    }
+
+    // Notify tenant admin via email
+    if (tenantAdmin) {
+      emailService.sendPlanGranted(tenantAdmin.email, tenantAdmin.name, normalizedPlan, req.user.email).catch(console.error);
+    }
+
+    auditLog({
+      userId: req.user.userId, userEmail: req.user.email,
+      action: AuditAction.UPDATE, resource: AuditResource.TENANT, resourceId: tenantId,
+      details: { action: 'grant_plan', plan: normalizedPlan, tenantName: tenant.name }, ipAddress: req.ip,
+    });
+
+    res.json({ tenant: updatedTenant, subscription, plan: normalizedPlan });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/super-admin/tenants/:tenantId/grant-trial
+ * Give any tenant a free trial of any plan for configurable days.
+ */
+router.post('/tenants/:tenantId/grant-trial', async (req, res, next) => {
+  try {
+    const { plan = 'pro', days = 14 } = req.body;
+    const normalizedPlan = plan.toLowerCase();
+    if (!VALID_PLAN_IDS.includes(normalizedPlan)) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: `plan must be one of: ${VALID_PLAN_IDS.join(', ')}` });
+    }
+    const trialDays = Math.max(1, Math.min(365, parseInt(days, 10) || 14));
+    const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+    const tenantId = req.params.tenantId;
+
+    const tenant = await prisma.tenant.findUnique({ where: { tenantId } });
+    if (!tenant) return res.status(404).json({ error: 'NOT_FOUND', message: 'Tenant not found' });
+
+    await prisma.tenant.update({
+      where: { tenantId },
+      data: { subscriptionTier: normalizedPlan, subscriptionStatus: 'active' },
+    });
+
+    const tenantAdmin = await prisma.user.findFirst({ where: { tenantId, role: 'tenant_admin' } });
+    const subUserId = tenantAdmin?.userId ?? req.user.userId;
+
+    const existing = await prisma.subscription.findFirst({
+      where: { tenantId, status: { in: ['active', 'trialing'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    let subscription;
+    if (existing) {
+      subscription = await prisma.subscription.update({
+        where: { subscriptionId: existing.subscriptionId },
+        data: { plan: normalizedPlan, status: 'trialing', trialEndsAt, cancelAtPeriodEnd: false },
+      });
+    } else {
+      subscription = await prisma.subscription.create({
+        data: { userId: subUserId, tenantId, plan: normalizedPlan, status: 'trialing', trialEndsAt },
+      });
+    }
+
+    if (tenantAdmin) {
+      emailService.sendTrialGranted(tenantAdmin.email, tenantAdmin.name, normalizedPlan, trialDays, trialEndsAt).catch(console.error);
+    }
+
+    auditLog({
+      userId: req.user.userId, userEmail: req.user.email,
+      action: AuditAction.UPDATE, resource: AuditResource.TENANT, resourceId: tenantId,
+      details: { action: 'grant_trial', plan: normalizedPlan, trialDays, trialEndsAt, tenantName: tenant.name },
+      ipAddress: req.ip,
+    });
+
+    res.json({ tenant, subscription, plan: normalizedPlan, trialEndsAt, trialDays });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/super-admin/tenants/:tenantId/email
+ * Send a custom email to all active admins of a tenant.
+ */
+router.post('/tenants/:tenantId/email', async (req, res, next) => {
+  try {
+    const { subject, message } = req.body;
+    if (!subject?.trim() || !message?.trim()) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'subject and message are required' });
+    }
+    const tenant = await prisma.tenant.findUnique({ where: { tenantId: req.params.tenantId } });
+    if (!tenant) return res.status(404).json({ error: 'NOT_FOUND', message: 'Tenant not found' });
+
+    const admins = await prisma.user.findMany({
+      where: { tenantId: req.params.tenantId, role: 'tenant_admin', isActive: true },
+      select: { email: true, name: true },
+    });
+    if (!admins.length) {
+      return res.status(400).json({ error: 'NO_ADMINS', message: 'No active tenant admins found' });
+    }
+
+    for (const admin of admins) {
+      emailService.sendCustomEmail(admin.email, admin.name, subject.trim(), message.trim(), req.user.email).catch(console.error);
+    }
+
+    auditLog({
+      userId: req.user.userId, userEmail: req.user.email,
+      action: AuditAction.CREATE, resource: AuditResource.TENANT, resourceId: req.params.tenantId,
+      details: { action: 'email_tenant', subject: subject.trim(), recipients: admins.map(a => a.email) },
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: `Email queued for ${admins.length} recipient(s)`, recipients: admins.map(a => a.email) });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/super-admin/email
+ * Send a custom email to a specific email address (not linked to a tenant).
+ */
+router.post('/email', async (req, res, next) => {
+  try {
+    const { to, name, subject, message } = req.body;
+    if (!to?.trim() || !subject?.trim() || !message?.trim()) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'to, subject and message are required' });
+    }
+    await emailService.sendCustomEmail(to.trim(), name || to.trim(), subject.trim(), message.trim(), req.user.email);
+    res.json({ message: `Email sent to ${to.trim()}` });
+  } catch (err) { next(err); }
 });
 
 // ── Internal helpers ──────────────────────────────────────────────────────────

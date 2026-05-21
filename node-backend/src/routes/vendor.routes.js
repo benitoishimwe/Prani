@@ -118,6 +118,135 @@ router.post(
   }
 );
 
+// ─── Vendor Portal routes (must be declared BEFORE /:vendorId) ───────────────
+
+router.get('/portal/profile', authenticate, async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getVendorByUserId(req.user.userId);
+    if (!vendor) return R.notFound(res, 'No vendor profile linked to your account');
+    return R.ok(res, vendor);
+  } catch (err) { next(err); }
+});
+
+router.patch('/portal/profile', authenticate, async (req, res, next) => {
+  try {
+    const vendor = await vendorService.updateVendorSelf(req.user.userId, req.body);
+    return R.ok(res, vendor, 'Profile updated');
+  } catch (err) { next(err); }
+});
+
+router.patch('/portal/profile/toggle-public', authenticate, async (req, res, next) => {
+  try {
+    const result = await vendorService.togglePublicVisibility(req.user.userId);
+    return R.ok(res, result, result.isPublic ? 'Now visible in marketplace' : 'Removed from marketplace');
+  } catch (err) { next(err); }
+});
+
+router.get('/portal/onboarding', authenticate, async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getVendorByUserId(req.user.userId);
+    if (!vendor) return R.notFound(res, 'No vendor profile linked to your account');
+    const onboarding = await vendorService.getVendorOnboarding(vendor.vendorId);
+    return R.ok(res, { vendor: { vendorId: vendor.vendorId, onboardingComplete: vendor.onboardingComplete }, onboarding });
+  } catch (err) { next(err); }
+});
+
+router.post('/portal/onboarding/step', authenticate, async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getVendorByUserId(req.user.userId);
+    if (!vendor) return R.notFound(res, 'No vendor profile linked to your account');
+    const { step } = req.body;
+    if (!step) return R.badRequest(res, 'step is required');
+    const result = await vendorService.completeOnboardingStep(vendor.vendorId, step);
+    return R.ok(res, result, 'Step completed');
+  } catch (err) { next(err); }
+});
+
+router.get('/portal/analytics', authenticate, async (req, res, next) => {
+  try {
+    const days = req.query.days ? parseInt(req.query.days, 10) : 30;
+    const result = await vendorService.getVendorPortalAnalytics(req.user.userId, days);
+    return R.ok(res, result);
+  } catch (err) { next(err); }
+});
+
+router.get('/portal/reviews', authenticate, async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getVendorByUserId(req.user.userId);
+    if (!vendor) return R.notFound(res, 'No vendor profile linked to your account');
+    const { page, size } = req.query;
+    const result = await vendorService.getVendorReviewsByVendorId(vendor.vendorId, {
+      page: page ? parseInt(page, 10) : 1,
+      size: size ? parseInt(size, 10) : 10,
+    });
+    return R.ok(res, result);
+  } catch (err) { next(err); }
+});
+
+router.get('/portal/inquiries', authenticate, async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getVendorByUserId(req.user.userId);
+    if (!vendor) return R.notFound(res, 'No vendor profile linked to your account');
+    const { page, size } = req.query;
+    const result = await vendorService.getVendorInquiriesByVendorId(vendor.vendorId, {
+      page: page ? parseInt(page, 10) : 1,
+      size: size ? parseInt(size, 10) : 10,
+    });
+    return R.ok(res, result);
+  } catch (err) { next(err); }
+});
+
+router.patch('/portal/inquiries/:id/mark-read', authenticate, async (req, res, next) => {
+  try {
+    const inquiry = await vendorService.markInquiryRead(req.params.id, req.user.userId);
+    return R.ok(res, inquiry, 'Inquiry marked as read');
+  } catch (err) { next(err); }
+});
+
+// ─── Admin action routes (declare before /:vendorId to avoid ambiguity) ──────
+
+router.post(
+  '/:vendorId/approve',
+  authenticate,
+  requireRole(Roles.TENANT_ADMIN, Roles.SUPER_ADMIN),
+  async (req, res, next) => {
+    try {
+      const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
+      if (!tenantId && req.user.role !== Roles.SUPER_ADMIN) return R.badRequest(res, 'Tenant context required');
+      const vendor = await vendorService.approveVendor(req.params.vendorId, tenantId);
+      return R.ok(res, vendor, 'Vendor approved for marketplace');
+    } catch (err) { next(err); }
+  }
+);
+
+router.post(
+  '/:vendorId/reject',
+  authenticate,
+  requireRole(Roles.TENANT_ADMIN, Roles.SUPER_ADMIN),
+  async (req, res, next) => {
+    try {
+      const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
+      if (!tenantId && req.user.role !== Roles.SUPER_ADMIN) return R.badRequest(res, 'Tenant context required');
+      const vendor = await vendorService.rejectVendor(req.params.vendorId, tenantId, req.body.reason);
+      return R.ok(res, vendor, 'Vendor rejected');
+    } catch (err) { next(err); }
+  }
+);
+
+router.patch(
+  '/:vendorId/internal-notes',
+  authenticate,
+  requireRole(Roles.TENANT_ADMIN, Roles.SUPER_ADMIN),
+  async (req, res, next) => {
+    try {
+      const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
+      if (!tenantId && req.user.role !== Roles.SUPER_ADMIN) return R.badRequest(res, 'Tenant context required');
+      const vendor = await vendorService.updateInternalNotes(req.params.vendorId, tenantId, req.body.notes);
+      return R.ok(res, vendor, 'Notes updated');
+    } catch (err) { next(err); }
+  }
+);
+
 // ─── GET /:vendorId — get vendor ──────────────────────────────────────────────
 router.get('/:vendorId', authenticate, async (req, res, next) => {
   try {

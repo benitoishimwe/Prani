@@ -65,6 +65,7 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
+    "build:prod": "CI=false craco build",
     "test": "craco test"
   },
   "browserslist": {

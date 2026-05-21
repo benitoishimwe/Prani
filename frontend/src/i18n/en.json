@@ -173,6 +173,8 @@
     "language": "Language",
     "english": "English",
     "kinyarwanda": "Kinyarwanda",
+    "french": "French",
+    "swahili": "Swahili",
     "mfa": "Two-Factor Authentication",
     "mfa_setup": "Setup MFA",
     "mfa_enabled": "MFA Enabled",

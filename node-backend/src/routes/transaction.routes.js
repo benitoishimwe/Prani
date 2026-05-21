@@ -36,7 +36,10 @@ router.post('/', authenticate, async (req, res, next) => {
     const tenantId = req.user.tenantId;
     if (!tenantId) return R.badRequest(res, 'Tenant context required');
 
-    const { type, itemId, eventId, eventName, staffId, staffName, quantity, photo, returnDate } = req.body;
+    const { type, itemId, eventId, eventName, quantity, photo, daysToReturn } = req.body;
+    // Default to the authenticated user so the NOT NULL constraint on staff_id is always satisfied
+    const staffId   = req.body.staffId   || req.user.userId;
+    const staffName = req.body.staffName || req.user.name;
 
     if (!type)   return R.badRequest(res, 'Transaction type is required');
     if (!itemId) return R.badRequest(res, 'Item ID is required');
@@ -52,10 +55,27 @@ router.post('/', authenticate, async (req, res, next) => {
       staffName,
       quantity,
       photo,
-      returnDate,
+      daysToReturn,
     });
 
     return R.created(res, transaction, 'Transaction recorded successfully');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── PATCH /:id — update transaction metadata ────────────────────────────────
+router.patch('/:id', authenticate, async (req, res, next) => {
+  try {
+    const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
+    const { daysToReturn, eventId, eventName, staffName } = req.body;
+    const updated = await transactionService.updateTransaction(req.params.id, tenantId, {
+      daysToReturn,
+      eventId,
+      eventName,
+      staffName,
+    });
+    return R.ok(res, updated);
   } catch (err) {
     next(err);
   }

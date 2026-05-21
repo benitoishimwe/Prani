@@ -160,6 +160,7 @@ export default function EventsPage() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchEvents(); }, [search, statusFilter]);
 
   return (
@@ -219,7 +220,21 @@ export default function EventsPage() {
         <EventFormModal onClose={() => setShowModal(false)} onSave={(ev) => { setEvents([ev, ...events]); setShowModal(false); }} />
       )}
       {selectedEvent && (
-        <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        <EventDetailModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          onUpdate={(updated, deletedId) => {
+            if (!updated && deletedId) {
+              // Event was deleted
+              setEvents(prev => prev.filter(e => e.eventId !== deletedId));
+              setSelectedEvent(null);
+            } else if (updated) {
+              // Event was edited
+              setEvents(prev => prev.map(e => e.eventId === updated.eventId ? { ...e, ...updated } : e));
+              setSelectedEvent(updated);
+            }
+          }}
+        />
       )}
     </div>
   );

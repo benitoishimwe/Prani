@@ -7,6 +7,7 @@ const http = require('http');
 const app = require('./app');
 const config = require('./config/env');
 const { disconnectPrisma } = require('./config/prisma');
+const { startScheduler } = require('./scheduler');
 
 const server = http.createServer(app);
 
@@ -78,6 +79,7 @@ process.on('uncaughtException', (err) => {
 // ── Start ────────────────────────────────────────────────────────────────────
 
 server.listen(config.port, () => {
+  startScheduler();
   console.log('');
   console.log('╔══════════════════════════════════════════════════╗');
   console.log('║           Prani Backend — Node.js                ║');

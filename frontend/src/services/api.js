@@ -49,7 +49,6 @@ export const authAPI = {
   sendEmailOtp: (userId) => api.post('/auth/send-email-otp', { userId }),
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
-  google: (session_id) => api.post('/auth/google', { session_id }),
   getTotpSetup: () => api.get('/auth/totp-setup'),
   verifyTotpSetup: (code) => api.post('/auth/verify-totp-setup', { code }),
   previewInvitation: (token) => api.get(`/auth/invitation/${token}`),
@@ -75,6 +74,7 @@ export const transactionAPI = {
   list: (params) => api.get('/transactions', { params }),
   get: (id) => api.get(`/transactions/${id}`),
   create: (data) => api.post('/transactions', data),
+  update: (id, data) => api.patch(`/transactions/${id}`, data),
   stats: () => api.get('/transactions/stats'),
 };
 
@@ -87,6 +87,23 @@ export const eventsAPI = {
   delete: (id) => api.delete(`/events/${id}`),
   stats: () => api.get('/events/stats'),
   getReport: (id) => api.get(`/events/${id}/report`, { responseType: 'blob' }),
+  // Tasks
+  listTasks:        (eventId, params) => api.get(`/events/${eventId}/tasks`, { params }),
+  createTask:       (eventId, data)   => api.post(`/events/${eventId}/tasks`, data),
+  updateTask:       (eventId, taskId, data) => api.patch(`/events/${eventId}/tasks/${taskId}`, data),
+  deleteTask:       (eventId, taskId) => api.delete(`/events/${eventId}/tasks/${taskId}`),
+  assignTask:       (taskId, assigneeId) => api.post(`/events/tasks/${taskId}/assign`, { assigneeId }),
+  updateTaskStatus: (taskId, status)  => api.patch(`/events/tasks/${taskId}/status`, { status }),
+  assignedToMe:     ()                => api.get('/events/tasks/assigned-to-me'),
+};
+
+// Notifications
+export const notificationsAPI = {
+  list:        () => api.get('/notifications'),
+  markRead:    (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
+  dismiss:     (id) => api.delete(`/notifications/${id}`),
+  clearAll:    () => api.delete('/notifications/clear-all'),
 };
 
 // Staff
@@ -96,7 +113,7 @@ export const staffAPI = {
   update: (id, data) => api.put(`/staff/${id}`, data),
   shifts: (params) => api.get('/staff/shifts/all', { params }),
   createShift: (data) => api.post('/staff/shifts', data),
-  updateShift: (id, data) => api.put(`/staff/shifts/${id}`, data),
+  updateShift: (id, data) => api.patch(`/staff/shifts/${id}`, data),
   deleteShift: (id) => api.delete(`/staff/shifts/${id}`),
   stats: () => api.get('/staff/stats'),
   // Self-service endpoints for logged-in staff member
@@ -106,15 +123,18 @@ export const staffAPI = {
   myRecentTransactions: () => api.get('/staff/me/recent-transactions'),
 };
 
-// Vendors (admin CRUD)
+// Vendors (admin CRUD + approval workflow)
 export const vendorsAPI = {
   list: (params) => api.get('/vendors', { params }),
   get: (id) => api.get(`/vendors/${id}`),
   create: (data) => api.post('/vendors', data),
   update: (id, data) => api.put(`/vendors/${id}`, data),
+  approve: (id) => api.post(`/vendors/${id}/approve`),
+  reject: (id, data) => api.post(`/vendors/${id}/reject`, data),
+  updateInternalNotes: (id, notes) => api.patch(`/vendors/${id}/internal-notes`, { notes }),
 };
 
-// Vendor self-service (for users with role "vendor")
+// Vendor self-service — legacy /me routes (kept for backward compat)
 export const vendorMeAPI = {
   me: () => api.get('/vendors/me'),
   updateMe: (data) => api.patch('/vendors/me', data),
@@ -122,12 +142,32 @@ export const vendorMeAPI = {
   inquiries: (params) => api.get('/vendors/me/inquiries', { params }),
 };
 
+// Vendor portal — full self-service suite
+export const vendorPortalAPI = {
+  profile: () => api.get('/vendors/portal/profile'),
+  updateProfile: (data) => api.patch('/vendors/portal/profile', data),
+  togglePublic: () => api.patch('/vendors/portal/profile/toggle-public'),
+  onboarding: () => api.get('/vendors/portal/onboarding'),
+  completeStep: (step) => api.post('/vendors/portal/onboarding/step', { step }),
+  analytics: (params) => api.get('/vendors/portal/analytics', { params }),
+  reviews: (params) => api.get('/vendors/portal/reviews', { params }),
+  inquiries: (params) => api.get('/vendors/portal/inquiries', { params }),
+  markInquiryRead: (id) => api.patch(`/vendors/portal/inquiries/${id}/mark-read`),
+};
+
 // Admin
 export const adminAPI = {
   users: (params) => api.get('/admin/users', { params }),
   createUser: (data) => api.post('/admin/users', data),
+  inviteUser: (data) => api.post('/admin/users/invite', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  changeRole: (id, role) => api.patch(`/admin/users/${id}/role`, { role }),
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
+  deactivateUser: (id) => api.post(`/admin/users/${id}/deactivate`),
+  activateUser: (id) => api.post(`/admin/users/${id}/activate`),
+  resendInvite: (id) => api.post(`/admin/users/${id}/resend-invite`),
+  resetPassword: (id) => api.post(`/admin/users/${id}/reset-password`),
+  linkVendor: (userId, vendorId) => api.post(`/admin/users/${userId}/link-vendor`, { vendorId }),
   auditLogs: (params) => api.get('/admin/audit-logs', { params }),
   stats: () => api.get('/admin/stats'),
   sessions: () => api.get('/admin/sessions'),
@@ -186,22 +226,67 @@ export const plannerAPI = {
 // Super Admin
 export const superAdminAPI = {
   stats: () => api.get('/super-admin/stats'),
+  plans: () => api.get('/super-admin/plans'),
   // Tenants
   listTenants: (params) => api.get('/super-admin/tenants', { params }),
   createTenant: (data) => api.post('/super-admin/tenants', data),
   getTenant: (id) => api.get(`/super-admin/tenants/${id}`),
   updateTenant: (id, data) => api.put(`/super-admin/tenants/${id}`, data),
   deactivateTenant: (id) => api.delete(`/super-admin/tenants/${id}`),
+  hardDeleteTenant: (id) => api.delete(`/super-admin/tenants/${id}/hard-delete`),
   // Tenant users
   listTenantUsers: (tenantId, params) => api.get(`/super-admin/tenants/${tenantId}/users`, { params }),
   createTenantAdmin: (tenantId, data) => api.post(`/super-admin/tenants/${tenantId}/users`, data),
   // Invitations
   inviteUser: (tenantId, data) => api.post(`/super-admin/tenants/${tenantId}/invite`, data),
   listInvitations: (tenantId, params) => api.get(`/super-admin/tenants/${tenantId}/invitations`, { params }),
+  // Subscription management
+  grantPlan: (tenantId, data) => api.post(`/super-admin/tenants/${tenantId}/grant-plan`, data),
+  grantTrial: (tenantId, data) => api.post(`/super-admin/tenants/${tenantId}/grant-trial`, data),
+  emailTenant: (tenantId, data) => api.post(`/super-admin/tenants/${tenantId}/email`, data),
+  // Feature gates
+  features: () => api.get('/super-admin/features'),
+  featureMatrix: () => api.get('/super-admin/feature-matrix'),
+  updateFeature: (id, data) => api.patch(`/super-admin/features/${id}`, data),
+  upsertFeatureGate: (data) => api.post('/super-admin/feature-gates', data),
+  deleteFeatureGate: (id) => api.delete(`/super-admin/feature-gates/${id}`),
+  // Subscriptions list
+  subscriptions: (params) => api.get('/super-admin/subscriptions', { params }),
+  // Custom email (any recipient)
+  sendEmail: (data) => api.post('/super-admin/email', data),
   // Impersonation
   impersonate: (userId) => api.post(`/super-admin/impersonate/${userId}`),
   // Audit logs
   auditLogs: (params) => api.get('/super-admin/audit-logs', { params }),
+};
+
+// Messages
+export const messagesAPI = {
+  // Team DMs
+  team:              ()           => api.get('/messages/team'),
+  conversations:     ()           => api.get('/messages/conversations'),
+  conversation:      (partnerId)  => api.get(`/messages/conversation/${partnerId}`),
+  sendDM:            (data)       => api.post('/messages/dm', data),
+  markConvRead:      (partnerId)  => api.patch(`/messages/conversation/${partnerId}/read`),
+  unreadCount:       ()           => api.get('/messages/unread-count'),
+  // Client broadcast (admin Clients tab)
+  clientMessages:    ()           => api.get('/messages/clients'),
+  sendClientMsg:     (data)       => api.post('/messages/clients', data),
+  markClientsRead:   ()           => api.patch('/messages/clients/read'),
+};
+
+// Subscriptions
+export const subscriptionsAPI = {
+  current:          ()         => api.get('/subscriptions/current'),
+  me:               ()         => api.get('/subscriptions/me'),
+  startTrial:       (plan)     => api.post('/subscriptions/trial', { plan }),
+  mockUpgrade:      (plan)     => api.post('/subscriptions/mock-upgrade', { plan }),
+  checkout:         (data)     => api.post('/subscriptions/checkout', data),
+  weddingCheckout:  ()         => api.post('/subscriptions/wedding-checkout'),
+  cancel:           ()         => api.post('/subscriptions/cancel'),
+  resume:           ()         => api.post('/subscriptions/resume'),
+  portal:           ()         => api.post('/subscriptions/portal'),
+  invoices:         ()         => api.get('/subscriptions/invoices'),
 };
 
 // AI

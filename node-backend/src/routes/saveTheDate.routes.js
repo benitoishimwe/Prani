@@ -19,6 +19,16 @@ const upload = multer({
   },
 });
 
+// ─── GET /public/:designId — public view (no auth) ───────────────────────────
+router.get('/public/:designId', async (req, res, next) => {
+  try {
+    const design = await saveDateService.getPublicDesign(req.params.designId);
+    return R.ok(res, design);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // All save-the-date routes require authentication
 router.use(authenticate);
 
@@ -106,6 +116,16 @@ router.post('/:designId/publish', async (req, res, next) => {
   try {
     const design = await saveDateService.publishDesign(req.params.designId, req.user.userId);
     return R.ok(res, design, 'Design published');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /:designId/unpublish — unpublish design ────────────────────────────
+router.post('/:designId/unpublish', async (req, res, next) => {
+  try {
+    const design = await saveDateService.unpublishDesign(req.params.designId, req.user.userId);
+    return R.ok(res, design, 'Design unpublished');
   } catch (err) {
     next(err);
   }

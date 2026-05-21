@@ -4,9 +4,11 @@ import { superAdminAPI } from '../../services/api';
 import { Plus, Building2, CheckCircle, XCircle, ChevronRight, Loader } from 'lucide-react';
 
 const TIER_COLORS = {
-  free: 'bg-gray-100 text-gray-600',
-  trial: 'bg-blue-50 text-blue-700',
-  pro: 'bg-[#E8F5EE] text-[#4A7C59]',
+  free:    'bg-gray-100 text-gray-600',
+  trial:   'bg-blue-50 text-blue-700',
+  pro:     'bg-[#E8F5EE] text-[#4A7C59]',
+  max:     'bg-teal-100 text-teal-700',
+  wedding: 'bg-pink-100 text-pink-700',
   enterprise: 'bg-[#FBE9E7] text-[#BF360C]',
 };
 
@@ -58,9 +60,11 @@ function CreateTenantModal({ onClose, onCreated }) {
               onChange={e => setForm(f => ({ ...f, subscription_tier: e.target.value }))}
               className="w-full border border-[#EBE5DB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A84C]"
             >
-              {['free', 'trial', 'pro', 'enterprise'].map(t => (
-                <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-              ))}
+              <option value="free">Free — $0</option>
+              <option value="pro">Pro — $29/mo</option>
+              <option value="max">Max — $79/mo</option>
+              <option value="wedding">Wedding — $49 once</option>
+              <option value="trial">Trial (14-day)</option>
             </select>
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}

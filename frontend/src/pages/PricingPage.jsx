@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, X, Sparkles, Zap, Building2, Heart, CreditCard, Smartphone } from 'lucide-react';
 import { useSubscription } from '../contexts/SubscriptionContext';
-import api from '../services/api';
+import { subscriptionsAPI } from '../services/api';
+import { toast } from 'sonner';
 
 const PLANS = [
   {
@@ -28,6 +29,7 @@ const PLANS = [
     popular: false,
     color: '#6B7280',
     stripePriceId: null,
+    action: 'free',
   },
   {
     key: 'pro',
@@ -52,6 +54,7 @@ const PLANS = [
     popular: true,
     color: '#E67E22',
     stripePriceId: process.env.REACT_APP_STRIPE_PRICE_PRO_MONTHLY,
+    action: 'trial',
   },
   {
     key: 'max',
@@ -76,6 +79,7 @@ const PLANS = [
     popular: false,
     color: '#0F4C5C',
     stripePriceId: process.env.REACT_APP_STRIPE_PRICE_MAX_MONTHLY,
+    action: 'trial',
   },
   {
     key: 'wedding',
@@ -100,6 +104,7 @@ const PLANS = [
     popular: false,
     color: '#FF6B6B',
     stripePriceId: process.env.REACT_APP_STRIPE_PRICE_WEDDING,
+    action: 'wedding',
     oneTime: true,
   },
 ];
@@ -124,30 +129,70 @@ function MatrixCell({ val }) {
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const { subscription } = useSubscription();
-  const [yearly, setYearly] = useState(false);
-  const [loading, setLoading] = useState(null);
-  const [showMatrix, setShowMatrix] = useState(false);
-  const [gateway, setGateway] = useState('stripe'); // 'stripe' | 'paystack'
+  const { subscription, currentPlan, isOnTrial, trialDaysLeft, refresh } = useSubscription();
+  const [yearly,     setYearly]     = useState(false);
+  const [loading,    setLoading]    = useState(null);
+  const [showMatrix, setShowMatrix] = useState(true);
+  const [gateway,    setGateway]    = useState('stripe');
 
-  const handleUpgrade = async (plan) => {
-    if (!plan.stripePriceId) return;
+  const handlePlanAction = async (plan) => {
+    if (loading) return;
     setLoading(plan.key);
+
     try {
-      const res = await api.post('/subscriptions/checkout', {
-        priceId: yearly && !plan.oneTime ? plan.stripePriceId + '_yearly' : plan.stripePriceId,
-        gateway,
-      });
-      const { url, checkoutUrl } = res.data?.data ?? res.data ?? {};
-      if (url || checkoutUrl) window.location.href = url || checkoutUrl;
+      // ── Free: just navigate to dashboard ────────────────────────────────
+      if (plan.action === 'free') {
+        navigate('/dashboard');
+        return;
+      }
+
+      // ── Trial: call POST /subscriptions/trial ────────────────────────────
+      if (plan.action === 'trial') {
+        await subscriptionsAPI.startTrial(plan.key);
+        toast.success(`Your 14-day ${plan.name} trial has started!`);
+        await refresh();
+        navigate('/dashboard');
+        return;
+      }
+
+      // ── Wedding: one-time checkout ────────────────────────────────────────
+      if (plan.action === 'wedding') {
+        const res = await subscriptionsAPI.weddingCheckout();
+        if (res.data?.url) {
+          window.location.href = res.data.url;
+        } else if (res.data?.activated) {
+          toast.success('Wedding plan activated!');
+          await refresh();
+          navigate('/dashboard');
+        }
+        return;
+      }
+
+      // ── Paid upgrade: Stripe checkout ────────────────────────────────────
+      if (plan.stripePriceId) {
+        const priceId = yearly && !plan.oneTime
+          ? (plan.key === 'pro'
+              ? process.env.REACT_APP_STRIPE_PRICE_PRO_YEARLY
+              : process.env.REACT_APP_STRIPE_PRICE_MAX_YEARLY)
+          : plan.stripePriceId;
+
+        const res = await subscriptionsAPI.checkout({ priceId, plan: plan.key, gateway });
+        const url = res.data?.url || res.data?.checkoutUrl;
+        if (url) window.location.href = url;
+      } else {
+        // No Stripe key configured — use mock upgrade for dev
+        await subscriptionsAPI.mockUpgrade(plan.key);
+        toast.success(`Upgraded to ${plan.name} (dev mode)`);
+        await refresh();
+        navigate('/dashboard');
+      }
     } catch (err) {
-      console.error('Checkout failed', err);
+      const msg = err.response?.data?.message || err.message || 'Something went wrong';
+      toast.error(msg);
     } finally {
       setLoading(null);
     }
   };
-
-  const currentPlan = subscription?.plan ?? 'max';
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
@@ -160,6 +205,15 @@ export default function PricingPage() {
         <p className="text-[#6B7280] mt-3 max-w-lg mx-auto">
           Start free. Upgrade when you're ready. All plans include Stripe and Paystack payment support.
         </p>
+
+        {/* Trial active notice */}
+        {isOnTrial && (
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium">
+            <Sparkles size={14} />
+            {trialDaysLeft !== null ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''} left on your trial` : 'Trial active'}
+            — upgrade now to keep access
+          </div>
+        )}
 
         {/* Billing toggle */}
         <div className="flex items-center justify-center gap-3 mt-6">
@@ -178,8 +232,8 @@ export default function PricingPage() {
         <div className="flex items-center justify-center gap-2 mt-4">
           <span className="text-xs text-[#6B7280]">Pay with:</span>
           {[
-            { id: 'stripe', label: 'Card (Stripe)', icon: CreditCard },
-            { id: 'paystack', label: 'Mobile Money (Paystack)', icon: Smartphone },
+            { id: 'stripe',   label: 'Card (Stripe)',            icon: CreditCard  },
+            { id: 'paystack', label: 'Mobile Money (Paystack)',  icon: Smartphone  },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -198,14 +252,30 @@ export default function PricingPage() {
       {/* Plan cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10 animate-slide-up">
         {PLANS.map((plan) => {
-          const price = plan.oneTime ? plan.monthlyPrice : (yearly ? plan.yearlyPrice : plan.monthlyPrice);
+          const price     = plan.oneTime ? plan.monthlyPrice : (yearly ? plan.yearlyPrice : plan.monthlyPrice);
           const isCurrent = currentPlan === plan.key;
-          const PlanIcon = plan.icon;
+          const isTrialPlan = isOnTrial && ['pro','max'].includes(plan.key) && plan.key === currentPlan;
+          const PlanIcon  = plan.icon;
+
+          // Determine label/disabled state
+          let ctaLabel = plan.cta;
+          let disabled  = isCurrent && !isOnTrial;
+
+          if (isCurrent && isOnTrial) {
+            ctaLabel = `Trial active (${trialDaysLeft ?? '?'}d left)`;
+            disabled = false;
+          } else if (isCurrent && !isOnTrial) {
+            ctaLabel = 'Current plan';
+          }
 
           return (
             <div key={plan.key} className={`plan-card ${plan.popular ? 'popular' : ''} flex flex-col`}>
               {plan.popular && <div className="tag tag-amber text-xs self-start mb-3">Most popular</div>}
-              {isCurrent && !plan.popular && <div className="tag tag-teal text-xs self-start mb-3">Current plan</div>}
+              {isCurrent && !plan.popular && (
+                <div className={`tag ${isOnTrial ? 'tag-amber' : 'tag-teal'} text-xs self-start mb-3`}>
+                  {isOnTrial ? 'Trial active' : 'Current plan'}
+                </div>
+              )}
 
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{background:`${plan.color}15`}}>
@@ -238,12 +308,12 @@ export default function PricingPage() {
               </ul>
 
               <button
-                onClick={() => isCurrent ? null : plan.stripePriceId ? handleUpgrade(plan) : navigate('/dashboard')}
-                disabled={isCurrent || loading === plan.key}
+                onClick={() => !disabled && handlePlanAction(plan)}
+                disabled={disabled || loading === plan.key}
                 className={`py-3 rounded-xl font-semibold text-sm transition-all ${
                   plan.popular
                     ? 'btn-amber py-3'
-                    : isCurrent
+                    : disabled
                     ? 'bg-[#E8F4F8] text-[#0F4C5C] cursor-default'
                     : 'border-2 border-[#0F4C5C] text-[#0F4C5C] hover:bg-[#E8F4F8]'
                 }`}
@@ -256,7 +326,7 @@ export default function PricingPage() {
                     </svg>
                     Processing...
                   </span>
-                ) : isCurrent ? 'Current plan' : plan.cta}
+                ) : ctaLabel}
               </button>
             </div>
           );

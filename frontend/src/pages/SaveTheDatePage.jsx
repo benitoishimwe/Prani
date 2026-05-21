@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus, Sparkles, Download, X, Upload, Trash2,
-  Edit3, Send, RefreshCw, CheckCircle, Eye, Calendar,
-  MapPin, Users, ChevronRight,
+  Edit3, Send, RefreshCw, Eye, Calendar,
+  MapPin, Users, ChevronRight, Link, Copy, Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SubscriptionGate from '../components/subscription/SubscriptionGate';
@@ -118,6 +118,7 @@ function DesignDetailModal({ design: initialDesign, onClose, onUpdate, onDelete 
   const [saving, setSaving]       = useState(false);
   const [deleting, setDeleting]   = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const fileRef = useRef(null);
 
@@ -179,16 +180,16 @@ function DesignDetailModal({ design: initialDesign, onClose, onUpdate, onDelete 
     try {
       let res;
       if (design.status === 'published') {
-        res = await api.patch(`/save-the-date/${design.designId}`, { status: 'generated' });
+        res = await api.post(`/save-the-date/${design.designId}/unpublish`);
       } else {
         res = await api.post(`/save-the-date/${design.designId}/publish`);
       }
       const updated = res.data;
       setDesign(updated);
       onUpdate(updated);
-      toast.success(design.status === 'published' ? 'Design unpublished' : 'Design published!');
-    } catch {
-      toast.error('Failed to update status');
+      toast.success(design.status === 'published' ? 'Design unpublished' : 'Design published! Share the link with guests.');
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to update status');
     } finally {
       setPublishing(false);
     }
@@ -363,16 +364,47 @@ function DesignDetailModal({ design: initialDesign, onClose, onUpdate, onDelete 
                   <button
                     onClick={handlePublish}
                     disabled={publishing}
-                    className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 ${
+                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 ${
                       design.status === 'published'
                         ? 'border border-[#4A7C59] text-[#4A7C59] hover:bg-[#E8F5EE]'
                         : 'border border-[#0F4C5C] text-[#0F4C5C] hover:bg-[#E8F4F8]'
                     }`}
                   >
                     {publishing ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
-                    {design.status === 'published' ? 'Unpublish' : 'Publish Design'}
+                    {design.status === 'published' ? 'Unpublish' : 'Publish & Share'}
                   </button>
                 </div>
+
+                {/* Share link — only when published */}
+                {design.status === 'published' && (() => {
+                  const shareUrl = `${window.location.origin}/card/${design.designId}`;
+                  const handleCopy = () => {
+                    navigator.clipboard.writeText(shareUrl).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2500);
+                    });
+                  };
+                  return (
+                    <div className="rounded-xl border border-[#4A7C59]/30 bg-[#E8F5EE] p-3">
+                      <p className="text-[10px] font-semibold text-[#4A7C59] uppercase tracking-wide mb-2 flex items-center gap-1">
+                        <Link size={11} /> Shareable Link
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="flex-1 text-xs text-[#2D2D2D] truncate font-mono bg-white rounded-lg px-2 py-1.5 border border-[#4A7C59]/20">
+                          {shareUrl}
+                        </p>
+                        <button
+                          onClick={handleCopy}
+                          className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#4A7C59] text-white text-xs font-semibold hover:bg-[#3A6B49] transition-colors"
+                        >
+                          {copied ? <Check size={12} /> : <Copy size={12} />}
+                          {copied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-[#4A7C59] mt-1.5">Anyone with this link can view the card</p>
+                    </div>
+                  );
+                })()}
 
                 <hr className="border-[#F0EAE0]" />
 

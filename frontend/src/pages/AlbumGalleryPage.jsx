@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { toast } from 'sonner';
 import {
   Camera, Download, QrCode, Trash2, Heart, Image, Video,
   ArrowLeft, Loader2, RefreshCw, X, ZoomIn, Plus
@@ -52,7 +53,7 @@ export default function AlbumGalleryPage() {
       await api.post(`/events/${eventId}/albums`, { title: 'Wedding Album' });
       await fetchAlbum();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to create album');
+      toast.error(err.response?.data?.message || 'Failed to create album');
     } finally {
       setCreating(false);
     }
