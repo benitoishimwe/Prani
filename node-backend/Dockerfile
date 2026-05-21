@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# OpenSSL is required by the Prisma query engine at runtime
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Install all deps (including devDeps so prisma CLI is available)

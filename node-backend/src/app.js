@@ -30,6 +30,10 @@ app.use(
       if (config.corsOrigins.includes(origin) || config.corsOrigins.includes('*')) {
         return callback(null, true);
       }
+      // Allow all Vercel preview deployments for this project
+      if (origin && origin.match(/^https:\/\/prani(-[a-z0-9]+)*\.vercel\.app$/)) {
+        return callback(null, true);
+      }
       return callback(new Error(`CORS: origin "${origin}" is not allowed`));
     },
     credentials: true,
