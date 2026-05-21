@@ -4,11 +4,9 @@ WORKDIR /app
 
 # Install all deps (including devDeps so prisma CLI is available)
 COPY package*.json ./
-RUN npm ci
-
-# Copy prisma schema and generate the Prisma client
+# Prisma schema must exist before npm ci so the postinstall `prisma generate` succeeds
 COPY prisma ./prisma/
-RUN npx prisma generate
+RUN npm ci
 
 # Copy application source
 COPY . .
