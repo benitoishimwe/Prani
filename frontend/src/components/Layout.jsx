@@ -61,7 +61,7 @@ export default function Layout({ children }) {
   const mobileItems = items.slice(0, 5);
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-[#E5E7EB]">
         <Link to="/dashboard" className="flex items-center gap-3 group">
@@ -146,7 +146,7 @@ export default function Layout({ children }) {
   return (
     <div className="flex h-screen bg-[#F9F9FB] overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-60 flex-col bg-white border-r border-[#E5E7EB] flex-shrink-0">
+      <aside className="hidden lg:flex w-60 flex-col bg-white border-r border-[#E5E7EB] flex-shrink-0 overflow-hidden">
         <SidebarContent />
       </aside>
 
@@ -154,7 +154,7 @@ export default function Layout({ children }) {
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
-          <aside className="relative w-64 bg-white h-full shadow-2xl z-10">
+          <aside className="relative w-64 bg-white h-full shadow-2xl z-10 flex flex-col overflow-hidden">
             <button
               onClick={() => setSidebarOpen(false)}
               className="absolute top-4 right-4 p-1 rounded-lg hover:bg-[#F9F9FB]"
