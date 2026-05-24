@@ -62,7 +62,10 @@ async function getAlbumById(albumId, tenantId) {
  * @param {string} token
  */
 async function getAlbumByToken(token) {
-  const album = await prisma.album.findUnique({ where: { token } });
+  const album = await prisma.album.findUnique({
+    where: { token },
+    include: { _count: { select: { media: true } } },
+  });
   if (!album || !album.isActive) throw new AppError('Album not found or inactive', 404, 'ALBUM_NOT_FOUND');
   return album;
 }

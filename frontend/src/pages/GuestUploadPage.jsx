@@ -17,8 +17,8 @@ export default function GuestUploadPage() {
   const fileInputRef = useRef();
 
   useEffect(() => {
-    axios.get(`${BASE_URL}/api/upload/${token}`)
-      .then(r => setAlbum(r.data))
+    axios.get(`${BASE_URL}/api/albums/public/${token}`)
+      .then(r => setAlbum(r.data.data ?? r.data))
       .catch(() => setError('This album link is invalid or has expired.'));
   }, [token]);
 
@@ -42,22 +42,26 @@ export default function GuestUploadPage() {
     if (!files.length) return;
     setUploading(true);
 
-    const formData = new FormData();
-    files.forEach(f => formData.append('files', f.file));
-    if (uploaderName.trim()) formData.append('uploader_name', uploaderName.trim());
-
     try {
-      await axios.post(`${BASE_URL}/api/upload/${token}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (e) => {
-          const pct = Math.round((e.loaded * 100) / (e.total || 1));
-          setProgress({ overall: pct });
-        },
-      });
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const formData = new FormData();
+        formData.append('file', f.file);
+        if (uploaderName.trim()) formData.append('uploaderName', uploaderName.trim());
+
+        await axios.post(`${BASE_URL}/api/upload/album/${token}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (e) => {
+            const filePct = Math.round((e.loaded * 100) / (e.total || 1));
+            const overall = Math.round(((i + filePct / 100) / files.length) * 100);
+            setProgress({ overall });
+          },
+        });
+      }
       setDone(true);
       files.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed. Please try again.');
+      setError(err.response?.data?.message || err.response?.data?.error || 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -126,7 +130,7 @@ export default function GuestUploadPage() {
           <p className="text-[#5C5C5C] text-sm mt-1">{album.description}</p>
         )}
         <p className="text-xs text-[#5C5C5C] mt-2">
-          {album.media_count} photo{album.media_count !== 1 ? 's' : ''} shared so far
+          {album._count?.media ?? 0} photo{(album._count?.media ?? 0) !== 1 ? 's' : ''} shared so far
         </p>
       </div>
 
@@ -160,13 +164,13 @@ export default function GuestUploadPage() {
           <Upload className="text-[#C9A84C] mx-auto mb-2" size={32} />
           <p className="font-semibold text-[#2D2D2D] text-sm">Tap to select photos & videos</p>
           <p className="text-xs text-[#5C5C5C] mt-1">
-            {album.allow_videos ? 'Images and videos' : 'Images only'} · Max {album.max_file_size_mb}MB per file
+            {album.allowVideos ? 'Images and videos' : 'Images only'} · Max {album.maxFileSizeMb}MB per file
           </p>
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept={album.allow_videos ? 'image/*,video/*' : 'image/*'}
+            accept={album.allowVideos ? 'image/*,video/*' : 'image/*'}
             className="hidden"
             onChange={handleFileSelect}
           />
