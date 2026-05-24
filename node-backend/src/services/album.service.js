@@ -286,7 +286,7 @@ async function deleteMedia(mediaId, albumId, tenantId) {
  */
 async function generateAlbumQrCode(albumId, tenantId, frontendUrl) {
   const album = await getAlbumById(albumId, tenantId);
-  const url = `${frontendUrl}/album/${album.token}`;
+  const url = `${frontendUrl}/upload/${album.token}`;
   return QRCode.toBuffer(url, { type: 'png', width: 400, margin: 2 });
 }
 

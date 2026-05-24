@@ -61,7 +61,8 @@ export default function AlbumGalleryPage() {
 
   const showQr = async () => {
     if (!qrUrl) {
-      const res = await api.get(`/albums/${data.album.albumId}/qrcode`, { responseType: 'blob' });
+      const baseUrl = encodeURIComponent(window.location.origin);
+      const res = await api.get(`/albums/${data.album.albumId}/qrcode?baseUrl=${baseUrl}`, { responseType: 'blob' });
       setQrUrl(URL.createObjectURL(res.data));
     }
     setQrVisible(true);

@@ -191,7 +191,9 @@ router.get('/:albumId/qrcode', authenticate, async (req, res, next) => {
     const tenantId = req.user.tenantId;
     if (!tenantId) return R.badRequest(res, 'Tenant context required');
 
-    const frontendUrl = config.frontendUrl;
+    // Prefer the origin sent by the browser so the QR code always points to
+    // the real deployed domain rather than the FRONTEND_URL env var default.
+    const frontendUrl = req.query.baseUrl || config.frontendUrl;
     const pngBuffer = await albumService.generateAlbumQrCode(
       req.params.albumId,
       tenantId,
