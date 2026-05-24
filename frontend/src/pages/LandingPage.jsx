@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Sparkles, Calendar, Package, Users, Store, BarChart3, Heart,
   Image, CheckCircle, ArrowRight, Star, Globe, Shield, Zap,
   QrCode, FileText, Bell, ChevronDown, ChevronUp, Menu, X
 } from 'lucide-react';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const FEATURES = [
   { icon: Calendar,  title: 'Event Management',      desc: 'Create and manage events end-to-end — tasks, timelines, checklists, budgets, and seating plans.' },
@@ -18,48 +21,6 @@ const FEATURES = [
   { icon: BarChart3, title: 'Reports & Analytics',   desc: 'Comprehensive reports, event PDFs, inventory analytics, and staff performance data.' },
 ];
 
-const PLANS = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: '',
-    desc: 'Perfect for exploring Prani.',
-    features: ['1 active event', '3 team members', 'Basic inventory', 'Guest photo album', 'Email support'],
-    cta: 'Get started free',
-    popular: false,
-    highlight: false,
-  },
-  {
-    name: 'Pro',
-    price: '$29',
-    period: '/month',
-    desc: 'For growing event businesses.',
-    features: ['Unlimited events', '20 team members', 'AI planning assistant', 'Save the Date (20/mo)', 'Vendor marketplace', 'Advanced reports', 'Priority support'],
-    cta: 'Start 14-day trial',
-    popular: true,
-    highlight: true,
-  },
-  {
-    name: 'Max',
-    price: '$79',
-    period: '/month',
-    desc: 'For large agencies & enterprises.',
-    features: ['Everything in Pro', 'Unlimited team members', 'White-label reports', 'API access', 'Subdomain support', 'Dedicated account manager', 'Custom integrations'],
-    cta: 'Start 14-day trial',
-    popular: false,
-    highlight: false,
-  },
-  {
-    name: 'Wedding',
-    price: '$49',
-    period: 'one-time',
-    desc: 'For a single unforgettable day.',
-    features: ['1 wedding event', 'All Pro features', 'Full wedding planner', 'Unlimited guests', 'Valid until wedding date + 30 days'],
-    cta: 'Plan my wedding',
-    popular: false,
-    highlight: false,
-  },
-];
 
 const FAQS = [
   { q: 'Is Prani available worldwide?', a: 'Yes. Prani is built for event planners everywhere — supporting multiple currencies, languages, and local payment methods. Whether you\'re in Kigali, London, Lagos, or New York, Prani adapts to your market.' },
@@ -120,6 +81,14 @@ function NavBar() {
 function HeroSection() {
   return (
     <section className="hero-section pt-16">
+      {/* Background photo — sits behind the CSS gradient overlay */}
+      <img
+        src="https://images.pexels.com/photos/2774556/pexels-photo-2774556.jpeg?auto=compress&cs=tinysrgb&w=1920"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ mixBlendMode: 'overlay', opacity: 0.35 }}
+      />
       {/* flex-1 so this area fills space and stats stay pinned at bottom */}
       <div className="relative z-10 flex-1 flex items-center w-full">
         <div className="max-w-7xl mx-auto w-full px-6 py-16 md:py-28 text-white">
@@ -281,8 +250,56 @@ function AiHighlight() {
   );
 }
 
+const STATIC_PLANS = [
+  {
+    key: 'free', name: 'Free', price: 0, yearlyPrice: 0, period: '', desc: 'Perfect for exploring Prani.',
+    features: ['1 active event', '3 team members', 'Basic inventory', 'Guest photo album', 'Email support'],
+    cta: 'Get started free', popular: false,
+  },
+  {
+    key: 'pro', name: 'Pro', price: 29, yearlyPrice: 24, period: '/month', desc: 'For growing event businesses.',
+    features: ['Unlimited events', '20 team members', 'AI planning assistant', 'Save the Date (20/mo)', 'Vendor marketplace', 'Advanced reports', 'Priority support'],
+    cta: 'Start 14-day trial', popular: true,
+  },
+  {
+    key: 'max', name: 'Max', price: 79, yearlyPrice: 66, period: '/month', desc: 'For large agencies & enterprises.',
+    features: ['Everything in Pro', 'Unlimited team members', 'White-label reports', 'API access', 'Subdomain support', 'Dedicated account manager', 'Custom integrations'],
+    cta: 'Start 14-day trial', popular: false,
+  },
+  {
+    key: 'wedding', name: 'Wedding', price: 49, yearlyPrice: 49, period: 'one-time', desc: 'For a single unforgettable day.',
+    features: ['1 wedding event', 'All Pro features', 'Full wedding planner', 'Unlimited guests', 'Valid until wedding date + 30 days'],
+    cta: 'Plan my wedding', popular: false, oneTime: true,
+  },
+];
+
 function PricingSection() {
-  const [yearly, setYearly] = useState(false);
+  const [yearly, setYearly]   = useState(false);
+  const [plans,  setPlans]    = useState(STATIC_PLANS);
+
+  useEffect(() => {
+    axios.get(`${BACKEND_URL}/api/subscriptions/plans`)
+      .then(res => {
+        const data = res.data?.data || res.data;
+        if (Array.isArray(data) && data.length > 0) {
+          // Merge API data with static metadata (prices come from static; features from DB)
+          const merged = data.map(api => {
+            const stat = STATIC_PLANS.find(s => s.key === api.key) || {};
+            return {
+              ...stat,
+              ...api,
+              price: stat.price ?? api.price,
+              yearlyPrice: stat.yearlyPrice ?? api.yearlyPrice,
+              period: stat.period ?? api.period,
+              features: api.features?.length > 0 ? api.features : stat.features,
+            };
+          });
+          setPlans(merged);
+        }
+      })
+      .catch(() => {}); // silently fall back to static
+  }, []);
+
   return (
     <section id="pricing" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6">
@@ -294,7 +311,6 @@ function PricingSection() {
           <p className="text-[#6B7280] mt-4 max-w-xl mx-auto">
             Start free. Upgrade when you're ready. Downgrade or cancel any time.
           </p>
-          {/* Billing toggle */}
           <div className="flex items-center justify-center gap-3 mt-6">
             <span className={`text-sm font-medium ${!yearly ? 'text-[#111827]' : 'text-[#6B7280]'}`}>Monthly</span>
             <button
@@ -309,21 +325,23 @@ function PricingSection() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {PLANS.map((plan) => {
-            const price = yearly && plan.name === 'Pro' ? '$24' : yearly && plan.name === 'Max' ? '$66' : plan.price;
+          {plans.map((plan) => {
+            const displayPrice = yearly && !plan.oneTime
+              ? (plan.yearlyPrice != null ? `$${plan.yearlyPrice}` : 'Custom')
+              : (plan.price != null ? `$${plan.price}` : 'Custom');
             return (
-              <div key={plan.name} className={`plan-card ${plan.popular ? 'popular' : ''} flex flex-col`}>
+              <div key={plan.key} className={`plan-card ${plan.popular ? 'popular' : ''} flex flex-col`}>
                 {plan.popular && (
                   <div className="tag tag-amber text-xs self-start mb-3">Most popular</div>
                 )}
                 <h3 className="text-xl font-bold text-[#111827]" style={{fontFamily:'Poppins,sans-serif'}}>{plan.name}</h3>
                 <div className="mt-2 mb-3 flex items-end gap-1">
-                  <span className="text-4xl font-bold text-[#111827]" style={{fontFamily:'Poppins,sans-serif'}}>{price}</span>
+                  <span className="text-4xl font-bold text-[#111827]" style={{fontFamily:'Poppins,sans-serif'}}>{displayPrice}</span>
                   {plan.period && <span className="text-[#6B7280] text-sm pb-1">{plan.period}</span>}
                 </div>
                 <p className="text-sm text-[#6B7280] mb-5">{plan.desc}</p>
                 <ul className="space-y-2.5 flex-1 mb-6">
-                  {plan.features.map(f => (
+                  {(plan.features || []).map(f => (
                     <li key={f} className="flex items-start gap-2 text-sm text-[#374151]">
                       <CheckCircle size={15} className="text-[#2E7D32] flex-shrink-0 mt-0.5" />
                       {f}

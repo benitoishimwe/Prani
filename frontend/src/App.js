@@ -39,6 +39,7 @@ import TenantsPage from './pages/super-admin/TenantsPage';
 import TenantDetailsPage from './pages/super-admin/TenantDetailsPage';
 import AuditLogsPage from './pages/super-admin/AuditLogsPage';
 import SubscriptionsPage from './pages/super-admin/SubscriptionsPage';
+import TestAccountsPage from './pages/super-admin/TestAccountsPage';
 import { Toaster } from 'sonner';
 import { registerServiceWorker } from './services/offline';
 import './App.css';
@@ -118,6 +119,9 @@ function AppRouter() {
       } />
       <Route path="/super-admin/audit-logs" element={
         <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><AuditLogsPage /></SuperAdminDashboard></ProtectedRoute>
+      } />
+      <Route path="/super-admin/test-accounts" element={
+        <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><TestAccountsPage /></SuperAdminDashboard></ProtectedRoute>
       } />
 
       {/* Catch-all: authenticated users go to dashboard */}

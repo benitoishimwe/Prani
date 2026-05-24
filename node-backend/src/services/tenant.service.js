@@ -153,41 +153,46 @@ async function hardDeleteTenant(tenantId) {
 
   // Delete in dependency order to satisfy FK constraints.
   // deepest children first, then parent tables, then the tenant itself.
+  // tenant_id columns are character varying in this DB — no ::uuid cast.
   await prisma.$transaction(async (tx) => {
     const t = tenantId;
     // ── Vendor sub-records ─────────────────────────────────────────────────────
-    await tx.$executeRaw`DELETE FROM vendor_reviews   WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM vendor_favorites WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM vendor_inquiries WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM vendor_portfolio WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM vendor_reviews   WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM vendor_favorites WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM vendor_inquiries WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM vendor_portfolio WHERE vendor_id IN (SELECT vendor_id FROM vendors WHERE tenant_id = ${t})`;
     // ── Album sub-records ──────────────────────────────────────────────────────
-    await tx.$executeRaw`DELETE FROM album_media WHERE album_id IN (SELECT album_id FROM albums WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM album_media WHERE album_id IN (SELECT album_id FROM albums WHERE tenant_id = ${t})`;
     // ── Wedding plan sub-records ───────────────────────────────────────────────
-    await tx.$executeRaw`DELETE FROM wedding_budget_items  WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM wedding_guests        WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM wedding_venues        WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM wedding_menu_items    WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM wedding_design_assets WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM wedding_budget_items  WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM wedding_guests        WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM wedding_venues        WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM wedding_menu_items    WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM wedding_design_assets WHERE plan_id IN (SELECT plan_id FROM wedding_plans WHERE tenant_id = ${t})`;
     // ── User sub-records ───────────────────────────────────────────────────────
-    await tx.$executeRaw`DELETE FROM user_sessions WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM email_otps    WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM audit_logs    WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM payments      WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
-    await tx.$executeRaw`DELETE FROM subscriptions WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t}::uuid)`;
+    await tx.$executeRaw`DELETE FROM user_sessions WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM email_otps    WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM audit_logs    WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM payments      WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t})`;
+    await tx.$executeRaw`DELETE FROM subscriptions WHERE user_id IN (SELECT user_id FROM users WHERE tenant_id = ${t})`;
+    // Also delete subscriptions referenced directly by tenant_id (e.g. orphaned after user reassignment)
+    await tx.$executeRaw`DELETE FROM subscriptions WHERE tenant_id = ${t}`;
     // ── Direct tenant-scoped tables ────────────────────────────────────────────
-    await tx.$executeRaw`DELETE FROM vendor_profiles       WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM vendors               WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM albums                WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM save_the_date_designs WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM wedding_plans         WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM event_tasks           WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM transactions          WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM shifts                WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM inventory             WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM events                WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM tenant_invitations    WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM users                 WHERE tenant_id = ${t}::uuid`;
-    await tx.$executeRaw`DELETE FROM tenants               WHERE tenant_id = ${t}::uuid`;
+    await tx.$executeRaw`DELETE FROM vendor_profiles       WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM vendors               WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM albums                WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM save_the_date_designs WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM wedding_plans         WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM event_tasks           WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM transactions          WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM shifts                WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM inventory             WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM events                WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM tenant_invitations    WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM test_accounts         WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM api_keys              WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM users                 WHERE tenant_id = ${t}`;
+    await tx.$executeRaw`DELETE FROM tenants               WHERE tenant_id = ${t}`;
   }, { timeout: 30000 });
 }
 

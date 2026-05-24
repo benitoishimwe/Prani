@@ -938,4 +938,163 @@ function _buildTenantUpdates(body) {
   return updates;
 }
 
+// ── Test Accounts ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/test-accounts
+ * List all test accounts.
+ */
+router.get('/test-accounts', async (req, res, next) => {
+  try {
+    const accounts = await prisma.testAccount.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        tenant: { select: { name: true, slug: true } },
+        user:   { select: { name: true, email: true } },
+      },
+    });
+    res.json({ testAccounts: accounts });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/super-admin/test-accounts
+ * Create a test account (new tenant + user + subscription override).
+ * Body: { email, name, plan, expiresAt, notes, tenantId? }
+ */
+router.post('/test-accounts', async (req, res, next) => {
+  try {
+    const { email, name, plan = 'pro', expiresAt, notes, tenantId: existingTenantId } = req.body;
+
+    if (!email) return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'email is required' });
+
+    const expiry = expiresAt ? new Date(expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    if (isNaN(expiry.getTime())) return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'Invalid expiresAt date' });
+
+    if (!VALID_PLAN_IDS.includes(plan.toLowerCase())) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: `plan must be one of: ${VALID_PLAN_IDS.join(', ')}` });
+    }
+
+    // Check if this email already has a test account
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      const existingTest = await prisma.testAccount.findFirst({ where: { email, isActive: true } });
+      if (existingTest) {
+        return res.status(409).json({ error: 'CONFLICT', message: 'An active test account already exists for this email' });
+      }
+    }
+
+    // Resolve tenant
+    let tenant;
+    if (existingTenantId) {
+      tenant = await prisma.tenant.findUnique({ where: { tenantId: existingTenantId } });
+      if (!tenant) return res.status(404).json({ error: 'NOT_FOUND', message: 'Tenant not found' });
+    } else {
+      const slug = `test-${Date.now()}`;
+      tenant = await prisma.tenant.create({
+        data: { name: `Test: ${name || email}`, slug, subscriptionTier: plan.toLowerCase(), subscriptionStatus: 'active' },
+      });
+    }
+
+    // Generate temp password
+    const crypto = require('crypto');
+    const bcrypt = require('bcryptjs');
+    const tempPassword = crypto.randomBytes(8).toString('hex');
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    // Create or reuse the user
+    let user = existing;
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: name || email.split('@')[0],
+          role: 'tenant_admin',
+          passwordHash,
+          tenantId: tenant.tenantId,
+          isActive: true,
+        },
+      });
+    } else {
+      await prisma.user.update({ where: { userId: user.userId }, data: { tenantId: tenant.tenantId, passwordHash } });
+    }
+
+    // Create subscription
+    const sub = await prisma.subscription.create({
+      data: {
+        userId:   user.userId,
+        tenantId: tenant.tenantId,
+        plan:     plan.toLowerCase(),
+        status:   'active',
+        trialEndsAt: expiry,
+      },
+    });
+
+    // Create test account record
+    const testAccount = await prisma.testAccount.create({
+      data: {
+        email,
+        tenantId:  tenant.tenantId,
+        userId:    user.userId,
+        createdBy: req.user.userId,
+        plan:      plan.toLowerCase(),
+        expiresAt: expiry,
+        notes:     notes || null,
+        isActive:  true,
+      },
+    });
+
+    const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`;
+
+    // Send invitation email (non-blocking)
+    emailService.sendTestAccountInvitation(
+      email,
+      name || email.split('@')[0],
+      loginUrl,
+      tempPassword,
+      plan.toLowerCase(),
+      expiry.toISOString(),
+    ).catch(console.error);
+
+    auditLog({
+      userId: req.user.userId, userEmail: req.user.email,
+      action: AuditAction.CREATE, resource: 'TestAccount', resourceId: testAccount.testAccountId,
+      details: { email, plan, expiresAt: expiry.toISOString(), tenantId: tenant.tenantId },
+      ipAddress: req.ip,
+    });
+
+    res.json({
+      testAccount,
+      tenant:      { tenantId: tenant.tenantId, name: tenant.name },
+      user:        { userId: user.userId, email: user.email },
+      subscription: sub,
+      tempPassword,
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * DELETE /api/super-admin/test-accounts/:testAccountId
+ * Deactivate a test account.
+ */
+router.delete('/test-accounts/:testAccountId', async (req, res, next) => {
+  try {
+    const ta = await prisma.testAccount.findUnique({ where: { testAccountId: req.params.testAccountId } });
+    if (!ta) return res.status(404).json({ error: 'NOT_FOUND', message: 'Test account not found' });
+
+    await prisma.testAccount.update({
+      where: { testAccountId: req.params.testAccountId },
+      data: { isActive: false },
+    });
+
+    // Also expire the subscription
+    await prisma.subscription.updateMany({
+      where: { userId: ta.userId, status: { in: ['active', 'trial'] } },
+      data: { status: 'expired' },
+    });
+
+    res.json({ message: 'Test account deactivated' });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

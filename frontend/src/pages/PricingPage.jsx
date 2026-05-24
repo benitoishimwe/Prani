@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, X, Sparkles, Zap, Building2, Heart, CreditCard, Smartphone } from 'lucide-react';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -109,16 +109,16 @@ const PLANS = [
   },
 ];
 
-const FEATURE_MATRIX = [
-  { label: 'Events',            free: '1', pro: 'Unlimited', max: 'Unlimited', wedding: '1' },
-  { label: 'Team members',      free: '3', pro: '20',        max: 'Unlimited', wedding: '10' },
-  { label: 'AI Assistant',      free: false, pro: true, max: true, wedding: true },
-  { label: 'Save the Date',     free: false, pro: '20/mo', max: 'Unlimited', wedding: '10' },
-  { label: 'Vendor marketplace',free: false, pro: true, max: true, wedding: true },
-  { label: 'Reports & PDFs',    free: 'Basic', pro: 'Full', max: 'White-label', wedding: 'Full' },
-  { label: 'Wedding planner',   free: false, pro: true, max: true, wedding: true },
-  { label: 'API access',        free: false, pro: false, max: true, wedding: false },
-  { label: 'Subdomain support', free: false, pro: false, max: true, wedding: false },
+const STATIC_FEATURE_MATRIX = [
+  { label: 'Events',             featureKey: null,               free: '1',      pro: 'Unlimited', max: 'Unlimited', wedding: '1' },
+  { label: 'Team members',       featureKey: null,               free: '3',      pro: '20',        max: 'Unlimited', wedding: '10' },
+  { label: 'AI Assistant',       featureKey: 'ai_assistant',     free: false,    pro: true,        max: true,        wedding: true },
+  { label: 'Save the Date',      featureKey: 'save_the_date',    free: false,    pro: '20/mo',     max: 'Unlimited', wedding: '10' },
+  { label: 'Vendor marketplace', featureKey: 'vendor_marketplace',free: false,   pro: true,        max: true,        wedding: true },
+  { label: 'Reports & PDFs',     featureKey: 'advanced_reports', free: 'Basic',  pro: 'Full',      max: 'White-label', wedding: 'Full' },
+  { label: 'Wedding planner',    featureKey: null,               free: false,    pro: true,        max: true,        wedding: true },
+  { label: 'API access',         featureKey: 'api_access',       free: false,    pro: false,       max: true,        wedding: false },
+  { label: 'White-label branding',featureKey: 'white_label',     free: false,    pro: false,       max: true,        wedding: false },
 ];
 
 function MatrixCell({ val }) {
@@ -130,10 +130,24 @@ function MatrixCell({ val }) {
 export default function PricingPage() {
   const navigate = useNavigate();
   const { subscription, currentPlan, isOnTrial, trialDaysLeft, refresh } = useSubscription();
-  const [yearly,     setYearly]     = useState(false);
-  const [loading,    setLoading]    = useState(null);
-  const [showMatrix, setShowMatrix] = useState(true);
-  const [gateway,    setGateway]    = useState('stripe');
+  const [yearly,       setYearly]       = useState(false);
+  const [loading,      setLoading]      = useState(null);
+  const [showMatrix,   setShowMatrix]   = useState(true);
+  const [gateway,      setGateway]      = useState('stripe');
+  const [planFeatures, setPlanFeatures] = useState(null); // { free: {ai_assistant: bool, ...}, pro: {...}, ... }
+
+  useEffect(() => {
+    subscriptionsAPI.plans()
+      .then(res => {
+        const data = res.data?.data || res.data;
+        if (Array.isArray(data)) {
+          const map = {};
+          data.forEach(p => { map[p.key] = p.featureMap || {}; });
+          setPlanFeatures(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handlePlanAction = async (plan) => {
     if (loading) return;
@@ -358,15 +372,23 @@ export default function PricingPage() {
                 </tr>
               </thead>
               <tbody>
-                {FEATURE_MATRIX.map(({ label, free, pro, max, wedding }, i) => (
-                  <tr key={label} className={i % 2 === 0 ? 'bg-white' : 'bg-[#F9F9FB]'}>
-                    <td className="px-6 py-3.5 text-sm text-[#374151] font-medium">{label}</td>
-                    <td className="px-4 py-3.5 text-center"><MatrixCell val={free} /></td>
-                    <td className="px-4 py-3.5 text-center"><MatrixCell val={pro} /></td>
-                    <td className="px-4 py-3.5 text-center"><MatrixCell val={max} /></td>
-                    <td className="px-4 py-3.5 text-center"><MatrixCell val={wedding} /></td>
-                  </tr>
-                ))}
+                {STATIC_FEATURE_MATRIX.map(({ label, featureKey, free, pro, max, wedding }, i) => {
+                  // Override with live DB values if available
+                  const resolve = (plan, staticVal) => {
+                    if (!featureKey || !planFeatures?.[plan]) return staticVal;
+                    const dbVal = planFeatures[plan][featureKey];
+                    return dbVal !== undefined ? dbVal : staticVal;
+                  };
+                  return (
+                    <tr key={label} className={i % 2 === 0 ? 'bg-white' : 'bg-[#F9F9FB]'}>
+                      <td className="px-6 py-3.5 text-sm text-[#374151] font-medium">{label}</td>
+                      <td className="px-4 py-3.5 text-center"><MatrixCell val={resolve('free', free)} /></td>
+                      <td className="px-4 py-3.5 text-center"><MatrixCell val={resolve('pro', pro)} /></td>
+                      <td className="px-4 py-3.5 text-center"><MatrixCell val={resolve('max', max)} /></td>
+                      <td className="px-4 py-3.5 text-center"><MatrixCell val={resolve('wedding', wedding)} /></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

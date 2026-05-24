@@ -96,8 +96,8 @@ export default function LoginPage() {
       {/* Left Panel - Hero */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img
-          src="https://images.pexels.com/photos/18064219/pexels-photo-18064219.jpeg"
-          alt="African wedding celebration"
+          src="https://images.pexels.com/photos/2774556/pexels-photo-2774556.jpeg?auto=compress&cs=tinysrgb&w=1920"
+          alt="Professional event planning"
           className="absolute inset-0 w-full h-full object-cover"
         />
         {/* Multi-layer gradient matching landing hero */}

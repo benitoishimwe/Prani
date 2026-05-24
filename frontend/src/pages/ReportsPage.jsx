@@ -53,7 +53,7 @@ export default function ReportsPage() {
   const invCatData = invStats.categories || [];
   const userRoleData = stats.users_by_role ? Object.entries(stats.users_by_role).map(([role, count]) => ({ role, count })) : [];
 
-  const handleExport = () => {
+  const handleExportJSON = () => {
     const data = {
       generated_at: new Date().toISOString(),
       platform: 'Prani',
@@ -69,13 +69,46 @@ export default function ReportsPage() {
     a.click();
   };
 
+  const handleExportCSV = () => {
+    const date = new Date().toISOString().split('T')[0];
+    const rows = [
+      ['Metric', 'Value'],
+      ['Generated At', new Date().toISOString()],
+      ['Total Events', stats.total_events || 0],
+      ['Inventory Items', stats.total_inventory ?? invStats.total ?? 0],
+      ['Total Transactions', stats.total_transactions || 0],
+      ['Total Users', stats.total_users || 0],
+      [],
+      ['Transaction Type', 'Count'],
+      ...Object.entries(txStats).filter(([k]) => k !== 'total').map(([type, count]) => [type, count]),
+      [],
+      ['Inventory Category', 'Count'],
+      ...(invStats.categories || []).map(({ category, count }) => [category, count]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${v ?? ''}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prani-report-${date}.csv`;
+    a.click();
+  };
+
+  // Keep backward-compatible single export handler (JSON by default)
+  const handleExport = handleExportJSON;
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <h1 className="text-3xl font-bold text-[#2D2D2D]" style={{fontFamily:'Playfair Display,serif'}}>{t('nav.reports')}</h1>
-        <button onClick={handleExport} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border-2 border-[#C9A84C] text-[#C9A84C] text-sm font-semibold hover:bg-[#C9A84C10]" data-testid="export-report-btn">
-          <Download size={16} /> {t('common.export')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border-2 border-[#C9A84C] text-[#C9A84C] text-sm font-semibold hover:bg-[#C9A84C10]" data-testid="export-csv-btn">
+            <Download size={15} /> CSV
+          </button>
+          <button onClick={handleExportJSON} className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-[#E5E7EB] text-[#6B7280] text-sm font-semibold hover:bg-[#F9FAFB]" data-testid="export-json-btn">
+            <Download size={15} /> JSON
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}

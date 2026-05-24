@@ -68,7 +68,7 @@ let prisma;
 if (config.isDevelopment) {
   // Use a versioned key so changing prisma.js always forces a fresh client
   // (e.g. when middleware is added).  The key is bumped intentionally here.
-  const CACHE_KEY = '__prismaClientV2';
+  const CACHE_KEY = '__prismaClientV3';
   if (!globalThis[CACHE_KEY]) {
     globalThis[CACHE_KEY] = makeClient({ log: ['query', 'info', 'warn', 'error'] });
   }

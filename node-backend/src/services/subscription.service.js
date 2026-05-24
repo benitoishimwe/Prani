@@ -7,6 +7,29 @@ const { AppError } = require('../middleware/errorHandler');
 
 const VALID_PLANS = ['free', 'trial', 'pro', 'max', 'enterprise', 'wedding', 'starter'];
 
+// Static pricing + display metadata per plan
+const PLAN_METADATA = {
+  free:       { price: 0,    yearlyPrice: 0,    period: '',           desc: 'Perfect for exploring Prani.',                  cta: 'Get started free',   popular: false, oneTime: false },
+  trial:      { price: 0,    yearlyPrice: 0,    period: '',           desc: 'Full access to all Pro features for 14 days.',  cta: 'Start free trial',   popular: false, oneTime: false },
+  pro:        { price: 29,   yearlyPrice: 24,   period: '/month',     desc: 'For growing event planning businesses.',        cta: 'Start 14-day trial', popular: true,  oneTime: false },
+  max:        { price: 79,   yearlyPrice: 66,   period: '/month',     desc: 'For large agencies and enterprise clients.',    cta: 'Start 14-day trial', popular: false, oneTime: false },
+  wedding:    { price: 49,   yearlyPrice: 49,   period: 'one-time',   desc: 'One-time payment for one unforgettable day.',   cta: 'Plan my wedding',    popular: false, oneTime: true  },
+  enterprise: { price: null, yearlyPrice: null, period: 'custom',     desc: 'Custom pricing for large organisations.',       cta: 'Contact sales',      popular: false, oneTime: false },
+};
+
+// Feature human-readable labels for the pricing UI
+const FEATURE_LABELS = {
+  ai_assistant:       'AI planning assistant',
+  save_the_date:      'Save the Date cards',
+  save_the_date_image:'Save-the-Date image generation',
+  vendor_marketplace: 'Vendor marketplace',
+  analytics:          'Advanced analytics',
+  unlimited_events:   'Unlimited events',
+  advanced_reports:   'Advanced reports & PDF export',
+  white_label:        'White-label branding',
+  api_access:         'API access',
+};
+
 const TRIAL_DAYS = 14;
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -208,15 +231,32 @@ async function getPlansWithFeatures() {
     orderBy: [{ plan: 'asc' }, { featureKey: 'asc' }],
   });
 
-  const grouped = {};
-  for (const plan of VALID_PLANS) {
-    grouped[plan] = {
-      plan,
-      features: allFeatures.filter((f) => f.plan === plan),
-    };
-  }
+  // Return an array of plans that the public pricing UI can consume directly
+  const displayPlans = ['free', 'pro', 'max', 'wedding'];
+  return displayPlans.map((planKey) => {
+    const meta = PLAN_METADATA[planKey] || {};
+    const dbFeatures = allFeatures.filter((f) => f.plan === planKey);
+    const featureMap = Object.fromEntries(dbFeatures.map((f) => [f.featureKey, f.isEnabled]));
 
-  return grouped;
+    // Build readable feature list: enabled features only
+    const featureList = Object.entries(FEATURE_LABELS)
+      .filter(([key]) => featureMap[key] === true)
+      .map(([, label]) => label);
+
+    return {
+      key: planKey,
+      name: planKey.charAt(0).toUpperCase() + planKey.slice(1),
+      price: meta.price,
+      yearlyPrice: meta.yearlyPrice,
+      period: meta.period,
+      desc: meta.desc,
+      cta: meta.cta,
+      popular: meta.popular,
+      oneTime: meta.oneTime,
+      features: featureList,
+      featureMap,
+    };
+  });
 }
 
 /**

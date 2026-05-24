@@ -11,6 +11,35 @@ const router = express.Router();
 // All tenant routes require authentication and super_admin role unless noted.
 const isSuperAdmin = [authenticate, requireRole(Roles.SUPER_ADMIN)];
 
+// ─── GET /api/tenants/me/branding ────────────────────────────────────────────
+// Returns branding config for the current user's tenant (any authenticated user).
+router.get('/me/branding', authenticate, async (req, res, next) => {
+  try {
+    if (!req.user.tenantId) return ok(res, { logoUrl: null, primaryColor: null });
+    const tenant = await tenantService.getTenantById(req.user.tenantId);
+    return ok(res, { logoUrl: tenant.logoUrl || null, primaryColor: tenant.primaryColor || null, name: tenant.name });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── PATCH /api/tenants/me/branding ──────────────────────────────────────────
+// Update branding for the current user's tenant (tenant_admin only).
+router.patch('/me/branding', authenticate, requireRole(Roles.TENANT_ADMIN), async (req, res, next) => {
+  try {
+    if (!req.user.tenantId) return badRequest(res, 'No tenant associated with this account');
+    const { logoUrl, primaryColor } = req.body;
+    const updates = {};
+    if (logoUrl !== undefined) updates.logoUrl = logoUrl;
+    if (primaryColor !== undefined) updates.primaryColor = primaryColor;
+    if (Object.keys(updates).length === 0) return badRequest(res, 'No branding fields provided');
+    const tenant = await tenantService.updateTenant(req.user.tenantId, updates);
+    return ok(res, { logoUrl: tenant.logoUrl || null, primaryColor: tenant.primaryColor || null }, 'Branding updated');
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── GET /api/tenants/stats/platform ─────────────────────────────────────────
 // Must be declared before /:tenantId to avoid 'stats' being treated as an ID.
 router.get('/stats/platform', ...isSuperAdmin, async (req, res, next) => {

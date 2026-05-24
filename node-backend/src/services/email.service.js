@@ -297,6 +297,71 @@ async function sendTaskAssigned(to, name, taskTitle, eventName, dashboardLink) {
   });
 }
 
+/**
+ * Send a test-account invitation email.
+ *
+ * @param {string} to          - Recipient email address
+ * @param {string} name        - Recipient name
+ * @param {string} loginUrl    - Direct login URL
+ * @param {string} password    - Temporary password
+ * @param {string} plan        - Plan granted (e.g. 'pro')
+ * @param {string} expiresAt   - ISO date string for expiry
+ * @returns {Promise<void>}
+ */
+async function sendTestAccountInvitation(to, name, loginUrl, password, plan, expiresAt) {
+  if (!isResendConfigured) {
+    warnUnconfigured(to);
+    console.info(`[email.service] Test account credentials for ${to}: ${loginUrl} / ${password}`);
+    return;
+  }
+
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const expiry    = new Date(expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "You've been invited to test Prani",
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;background:#ffffff;border-radius:10px;">
+        <div style="text-align:center;margin-bottom:28px;">
+          <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:#0F4C5C;">
+            <span style="color:#fff;font-weight:800;font-size:20px;font-family:Poppins,sans-serif;">P</span>
+          </div>
+          <h1 style="font-family:Poppins,sans-serif;color:#111827;margin:12px 0 0;font-size:22px;">Welcome to Prani</h1>
+        </div>
+
+        <p style="color:#374151;margin-bottom:8px;">Hi <strong>${name || to}</strong>,</p>
+        <p style="color:#374151;margin-bottom:24px;">
+          You've been given access to a <strong>${planLabel} test account</strong> on Prani — the all-in-one event planning platform.
+          This account is active until <strong>${expiry}</strong>.
+        </p>
+
+        <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px;margin-bottom:24px;">
+          <p style="margin:0 0 8px;font-weight:600;color:#111827;font-size:14px;">Your login credentials</p>
+          <p style="margin:0 0 4px;font-size:13px;color:#374151;"><strong>Email:</strong> ${to}</p>
+          <p style="margin:0;font-size:13px;color:#374151;"><strong>Temporary password:</strong> <code style="background:#E5E7EB;padding:2px 6px;border-radius:4px;">${password}</code></p>
+        </div>
+
+        <p style="color:#6B7280;font-size:13px;margin-bottom:20px;">
+          Please change your password after your first login. This test account grants access to all <strong>${planLabel}</strong> features.
+        </p>
+
+        <a href="${loginUrl}"
+           style="display:block;text-align:center;padding:14px 28px;background:#0F4C5C;color:#fff;border-radius:50px;text-decoration:none;font-weight:700;font-size:15px;margin-bottom:24px;">
+          Open Prani &rarr;
+        </a>
+
+        <p style="color:#9CA3AF;font-size:12px;text-align:center;margin:0;">
+          This is a test account provided by the Prani team. It expires on ${expiry}.<br>
+          Questions? Reply to this email.
+        </p>
+      </div>
+    `,
+    text: `Hi ${name || to},\n\nYou've been given a ${planLabel} test account on Prani.\n\nEmail: ${to}\nTemporary password: ${password}\n\nLogin: ${loginUrl}\n\nThis account expires on ${expiry}.`,
+  });
+}
+
 module.exports = {
   sendEmailOtp,
   sendInvitation,
@@ -307,4 +372,5 @@ module.exports = {
   sendTrialGranted,
   sendCustomEmail,
   sendTaskAssigned,
+  sendTestAccountInvitation,
 };

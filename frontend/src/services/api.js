@@ -258,6 +258,10 @@ export const superAdminAPI = {
   impersonate: (userId) => api.post(`/super-admin/impersonate/${userId}`),
   // Audit logs
   auditLogs: (params) => api.get('/super-admin/audit-logs', { params }),
+  // Test accounts
+  listTestAccounts:   ()     => api.get('/super-admin/test-accounts'),
+  createTestAccount:  (data) => api.post('/super-admin/test-accounts', data),
+  deleteTestAccount:  (id)   => api.delete(`/super-admin/test-accounts/${id}`),
 };
 
 // Messages
@@ -277,6 +281,7 @@ export const messagesAPI = {
 
 // Subscriptions
 export const subscriptionsAPI = {
+  plans:            ()         => api.get('/subscriptions/plans'),
   current:          ()         => api.get('/subscriptions/current'),
   me:               ()         => api.get('/subscriptions/me'),
   startTrial:       (plan)     => api.post('/subscriptions/trial', { plan }),

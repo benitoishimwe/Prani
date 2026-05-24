@@ -41,6 +41,7 @@ const staffRoutes        = require('./staff.routes');
 const superAdminRoutes   = require('./super-admin.routes');
 const messagesRoutes       = require('./messages.routes');
 const notificationRoutes   = require('./notification.routes');
+const apiKeysRoutes        = require('./apiKeys.routes');
 
 const router = Router();
 
@@ -100,5 +101,6 @@ router.use('/staff',          staffRoutes);
 router.use('/super-admin',    superAdminRoutes);
 router.use('/messages',       messagesRoutes);
 router.use('/notifications',  notificationRoutes);
+router.use('/api-keys',       apiKeysRoutes);
 
 module.exports = router;

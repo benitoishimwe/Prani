@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, CheckCheck, ClipboardList, X } from 'lucide-react';
 import { notificationsAPI } from '../services/api';
 
@@ -18,8 +19,11 @@ function timeAgo(dateStr) {
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount]     = useState(0);
+  const [open, setOpen]                   = useState(false);
+  const [pos, setPos]                     = useState({});
+
+  const bellRef     = useRef(null);
   const dropdownRef = useRef(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -32,25 +36,26 @@ export default function NotificationBell() {
     }
   }, []);
 
-  // Initial fetch + 30-second poll
   useEffect(() => {
     fetchNotifications();
     const id = setInterval(fetchNotifications, 30000);
     return () => clearInterval(id);
   }, [fetchNotifications]);
 
-  // Re-fetch when tab regains focus
   useEffect(() => {
     const onFocus = () => fetchNotifications();
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [fetchNotifications]);
 
-  // Close dropdown on outside click
+  // Close on outside click — exclude both the bell and the portal dropdown
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target) &&
+        bellRef.current    && !bellRef.current.contains(e.target)
+      ) {
         setOpen(false);
       }
     };
@@ -58,44 +63,78 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const handleOpen = () => setOpen((v) => !v);
+  // Calculate the best fixed position for the dropdown relative to the bell.
+  // When the bell is on the LEFT half (sidebar), left-anchor so the dropdown
+  // opens rightward into the viewport. When on the RIGHT half (top bar),
+  // right-anchor so it doesn't overflow off the right edge.
+  const calcPos = () => {
+    if (!bellRef.current) return;
+    const rect = bellRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const dropW = Math.min(320, vw - 16);
+    const top = rect.bottom + 8;
+
+    if ((rect.left + rect.right) / 2 > vw / 2) {
+      // Bell is on the right half — right-anchor
+      const right = Math.max(8, vw - rect.right);
+      setPos({ top, right });
+    } else {
+      // Bell is on the left half (sidebar) — left-anchor
+      const left = Math.max(8, Math.min(rect.left, vw - dropW - 8));
+      setPos({ top, left });
+    }
+  };
+
+  // Recalculate on scroll/resize so the portal stays aligned
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener('scroll', calcPos, true);
+    window.addEventListener('resize', calcPos);
+    return () => {
+      window.removeEventListener('scroll', calcPos, true);
+      window.removeEventListener('resize', calcPos);
+    };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleOpen = () => {
+    calcPos();
+    setOpen(v => !v);
+  };
 
   const handleMarkRead = async (id, e) => {
     e.stopPropagation();
     try {
       await notificationsAPI.markRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.notificationId === id ? { ...n, isRead: true } : n))
+      setNotifications(prev =>
+        prev.map(n => (n.notificationId === id ? { ...n, isRead: true } : n))
       );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      setUnreadCount(c => Math.max(0, c - 1));
     } catch {}
   };
 
   const handleMarkAllRead = async () => {
     try {
       await notificationsAPI.markAllRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch {}
   };
 
   const handleDismiss = async (id, e) => {
     e.stopPropagation();
-    setNotifications((prev) => prev.filter((n) => n.notificationId !== id));
-    try {
-      await notificationsAPI.dismiss(id);
-    } catch {}
+    setNotifications(prev => prev.filter(n => n.notificationId !== id));
+    try { await notificationsAPI.dismiss(id); } catch {}
   };
 
   const handleClearAll = async () => {
     try {
       await notificationsAPI.clearAll();
-      setNotifications((prev) => prev.filter((n) => !n.isRead));
+      setNotifications(prev => prev.filter(n => !n.isRead));
     } catch {}
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div ref={bellRef}>
       {/* Bell button */}
       <button
         onClick={handleOpen}
@@ -110,9 +149,19 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] z-[200] overflow-hidden">
+      {/* Dropdown rendered in document.body via portal — escapes overflow:hidden ancestors */}
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            ...(pos.left  !== undefined ? { left:  pos.left  } : {}),
+            ...(pos.right !== undefined ? { right: pos.right } : {}),
+            zIndex: 9999,
+          }}
+          className="w-80 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] overflow-hidden"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F3F4F6]">
             <h3 className="font-semibold text-sm text-[#111827]">Notifications</h3>
@@ -126,7 +175,7 @@ export default function NotificationBell() {
                   <CheckCheck size={14} /> Mark all read
                 </button>
               )}
-              {notifications.some((n) => n.isRead) && (
+              {notifications.some(n => n.isRead) && (
                 <button
                   onClick={handleClearAll}
                   className="text-xs text-[#EF4444] hover:text-[#DC2626] transition-colors"
@@ -149,7 +198,7 @@ export default function NotificationBell() {
                 No notifications yet
               </div>
             ) : (
-              notifications.map((n) => {
+              notifications.map(n => {
                 const Icon = ICON_BY_TYPE[n.type] || Bell;
                 return (
                   <div
@@ -175,7 +224,7 @@ export default function NotificationBell() {
                     <div className="flex flex-col gap-1 flex-shrink-0">
                       {!n.isRead && (
                         <button
-                          onClick={(e) => handleMarkRead(n.notificationId, e)}
+                          onClick={e => handleMarkRead(n.notificationId, e)}
                           className="p-1 rounded hover:bg-[#BFDBFE] transition-colors"
                           title="Mark as read"
                         >
@@ -183,7 +232,7 @@ export default function NotificationBell() {
                         </button>
                       )}
                       <button
-                        onClick={(e) => handleDismiss(n.notificationId, e)}
+                        onClick={e => handleDismiss(n.notificationId, e)}
                         className="p-1 rounded hover:bg-[#FEE2E2] transition-colors"
                         title="Dismiss"
                       >
@@ -195,7 +244,8 @@ export default function NotificationBell() {
               })
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

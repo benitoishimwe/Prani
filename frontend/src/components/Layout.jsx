@@ -3,50 +3,99 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import TrialBanner from './TrialBanner';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../contexts/AuthContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import { useLang } from '../contexts/LanguageContext';
 import {
   LayoutDashboard, Calendar, Package, ArrowLeftRight, Users, Store,
-  BarChart3, ShieldCheck, Sparkles, Settings, LogOut, Menu, X, Bell, Globe,
-  CreditCard, Heart, Image, MapPin, ChevronRight, Briefcase, Star, MessageSquare,
-  Receipt,
+  BarChart3, ShieldCheck, Sparkles, Settings, LogOut, Menu, X,
+  CreditCard, Heart, Image, MapPin, Briefcase, MessageSquare, Receipt,
 } from 'lucide-react';
 
-/** Navigation items per role. Returns the items the given role should see. */
-function getNavItems(t, role) {
-  const all = {
-    dashboard:      { path: '/dashboard',     label: t('nav.dashboard'),     icon: LayoutDashboard },
-    events:         { path: '/events',         label: t('nav.events'),        icon: Calendar },
-    planner:        { path: '/planner',        label: 'Planner',              icon: Heart },
-    inventory:      { path: '/inventory',      label: t('nav.inventory'),     icon: Package },
-    transactions:   { path: '/transactions',   label: t('nav.transactions'),  icon: ArrowLeftRight },
-    staff:          { path: '/staff',          label: t('nav.staff'),         icon: Users },
-    vendors:        { path: '/vendors',        label: t('nav.vendors'),       icon: Store },
-    marketplace:    { path: '/marketplace',    label: 'Marketplace',          icon: MapPin },
-    ai:             { path: '/ai',             label: t('nav.ai'),            icon: Sparkles },
-    reports:        { path: '/reports',        label: t('nav.reports'),       icon: BarChart3 },
-    savethedate:    { path: '/save-the-date',  label: 'Save the Date',        icon: Image },
-    pricing:        { path: '/pricing',        label: 'Pricing',              icon: CreditCard },
-    admin:          { path: '/admin',          label: t('nav.admin'),         icon: ShieldCheck },
-    settings:       { path: '/settings',       label: t('nav.settings'),      icon: Settings },
-    vendor_profile: { path: '/vendor-profile', label: 'My Profile',           icon: Briefcase },
-    messages:       { path: '/messages',        label: 'Messages',             icon: MessageSquare },
-    billing:        { path: '/billing',         label: 'Billing',              icon: Receipt },
-  };
+/**
+ * Master nav item registry.
+ *
+ * roles     – which roles see this item (always visible to those roles)
+ * featureKey – if set, the item is additionally hidden unless the tenant's
+ *              subscription plan enables that feature
+ * labelKey  – i18n key resolved via t(); use `label` for hardcoded strings
+ */
+const NAV_REGISTRY = [
+  { key: 'dashboard',      path: '/dashboard',     labelKey: 'nav.dashboard',    icon: LayoutDashboard,
+    roles: ['tenant_admin', 'event_manager', 'staff', 'client', 'vendor'] },
 
-  const byRole = {
-    tenant_admin:  ['dashboard','events','planner','inventory','transactions','staff','vendors','ai','reports','savethedate','pricing','admin','messages','billing','settings'],
-    event_manager: ['dashboard','events','planner','inventory','staff','marketplace','ai','savethedate','messages','settings'],
-    staff:         ['dashboard','inventory','transactions','messages','settings'],
-    client:        ['dashboard','events','planner','ai','marketplace','settings'],
-    vendor:        ['dashboard','vendor_profile','marketplace','settings'],
-  };
+  { key: 'events',         path: '/events',         labelKey: 'nav.events',       icon: Calendar,
+    roles: ['tenant_admin', 'event_manager', 'client'] },
 
-  const keys = byRole[role] ?? ['dashboard','events','inventory','settings'];
-  return keys.map(k => all[k]).filter(Boolean);
+  { key: 'planner',        path: '/planner',        label: 'Planner',             icon: Heart,
+    roles: ['tenant_admin', 'event_manager', 'client'] },
+
+  { key: 'inventory',      path: '/inventory',      labelKey: 'nav.inventory',    icon: Package,
+    roles: ['tenant_admin', 'event_manager', 'staff'] },
+
+  { key: 'transactions',   path: '/transactions',   labelKey: 'nav.transactions', icon: ArrowLeftRight,
+    roles: ['tenant_admin', 'staff'] },
+
+  { key: 'staff',          path: '/staff',          labelKey: 'nav.staff',        icon: Users,
+    roles: ['tenant_admin', 'event_manager'] },
+
+  { key: 'vendors',        path: '/vendors',        labelKey: 'nav.vendors',      icon: Store,
+    roles: ['tenant_admin'] },
+
+  { key: 'marketplace',    path: '/marketplace',    label: 'Marketplace',         icon: MapPin,
+    roles: ['event_manager', 'client', 'vendor'] },
+
+  // ── Feature-gated items ───────────────────────────────────────────────────
+  { key: 'ai',             path: '/ai',             labelKey: 'nav.ai',           icon: Sparkles,
+    roles: ['tenant_admin', 'event_manager', 'client'], featureKey: 'ai_assistant' },
+
+  { key: 'savethedate',    path: '/save-the-date',  label: 'Save the Date',       icon: Image,
+    roles: ['tenant_admin', 'event_manager'],           featureKey: 'save_the_date' },
+
+  { key: 'reports',        path: '/reports',        labelKey: 'nav.reports',      icon: BarChart3,
+    roles: ['tenant_admin'],                            featureKey: 'advanced_reports' },
+
+  // ── Tenant-admin only ─────────────────────────────────────────────────────
+  { key: 'pricing',        path: '/pricing',        label: 'Pricing',             icon: CreditCard,
+    roles: ['tenant_admin'] },
+
+  { key: 'admin',          path: '/admin',          labelKey: 'nav.admin',        icon: ShieldCheck,
+    roles: ['tenant_admin'] },
+
+  { key: 'messages',       path: '/messages',       label: 'Messages',            icon: MessageSquare,
+    roles: ['tenant_admin', 'event_manager', 'staff'] },
+
+  { key: 'billing',        path: '/billing',        label: 'Billing',             icon: Receipt,
+    roles: ['tenant_admin'] },
+
+  // ── Vendor-only ───────────────────────────────────────────────────────────
+  { key: 'vendor_profile', path: '/vendor-profile', label: 'My Profile',          icon: Briefcase,
+    roles: ['vendor'] },
+
+  // ── Universal ─────────────────────────────────────────────────────────────
+  { key: 'settings',       path: '/settings',       labelKey: 'nav.settings',     icon: Settings,
+    roles: ['tenant_admin', 'event_manager', 'staff', 'client', 'vendor'] },
+];
+
+/** Resolve translated or static label for a registry entry. */
+function resolveLabel(item, t) {
+  return item.labelKey ? t(item.labelKey) : item.label;
+}
+
+/**
+ * Build the nav list for the current user:
+ * 1. Keep only items whose roles include the user's role.
+ * 2. For feature-gated items, additionally require isFeatureEnabled().
+ */
+function buildNavItems(role, t, isFeatureEnabled) {
+  return NAV_REGISTRY
+    .filter(item => item.roles.includes(role))
+    .filter(item => !item.featureKey || isFeatureEnabled(item.featureKey))
+    .map(item => ({ ...item, label: resolveLabel(item, t) }));
 }
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { isFeatureEnabled } = useSubscription();
   const { t, lang, switchLang, languages } = useLang();
   const location = useLocation();
   const navigate = useNavigate();
@@ -57,7 +106,7 @@ export default function Layout({ children }) {
     navigate('/login');
   };
 
-  const items = getNavItems(t, user?.role);
+  const items = buildNavItems(user?.role ?? '', t, isFeatureEnabled);
   const mobileItems = items.slice(0, 5);
 
   const SidebarContent = () => (
@@ -87,7 +136,7 @@ export default function Layout({ children }) {
           )}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-[#111827] truncate">{user?.name}</p>
-            <p className="text-xs text-[#0F4C5C] capitalize font-medium">{user?.role?.replace('_',' ')}</p>
+            <p className="text-xs text-[#0F4C5C] capitalize font-medium">{user?.role?.replace('_', ' ')}</p>
           </div>
           <NotificationBell />
         </div>
@@ -101,7 +150,7 @@ export default function Layout({ children }) {
             to={path}
             onClick={() => setSidebarOpen(false)}
             className={`sidebar-link ${location.pathname === path ? 'active' : ''}`}
-            data-testid={`nav-${path.replace(/\//g,'').replace(/-/g,'')}`}
+            data-testid={`nav-${path.replace(/\//g, '').replace(/-/g, '')}`}
           >
             <Icon size={18} />
             <span>{label}</span>
@@ -110,8 +159,7 @@ export default function Layout({ children }) {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-[#E5E7EB] space-y-1">
-        {/* Language selector — cycles through all 4 languages */}
+      <div className="px-3 py-3 border-t border-[#E5E7EB] space-y-1" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         <div className="px-2 pb-1">
           <p className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wide mb-1.5 px-1">Language</p>
           <div className="grid grid-cols-2 gap-1">
@@ -152,7 +200,7 @@ export default function Layout({ children }) {
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-[60] flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
           <aside className="relative w-64 bg-white h-full shadow-2xl z-10 flex flex-col overflow-hidden">
             <button
@@ -213,7 +261,7 @@ export default function Layout({ children }) {
                   className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${
                     active ? 'text-[#0F4C5C]' : 'text-[#6B7280]'
                   }`}
-                  data-testid={`mobile-nav-${path.replace(/\//g,'')}`}
+                  data-testid={`mobile-nav-${path.replace(/\//g, '')}`}
                 >
                   <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
                   <span className="text-[10px] font-medium leading-none">{label.split(' ')[0]}</span>

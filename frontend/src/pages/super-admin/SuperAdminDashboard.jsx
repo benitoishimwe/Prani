@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { superAdminAPI } from '../../services/api';
-import { Building2, Users, LayoutDashboard, FileText, LogOut, ShieldAlert, CreditCard } from 'lucide-react';
+import { Building2, Users, LayoutDashboard, FileText, LogOut, ShieldAlert, CreditCard, FlaskConical } from 'lucide-react';
 
 const NAV = [
-  { label: 'Dashboard',      path: '/super-admin',               icon: LayoutDashboard },
-  { label: 'Tenants',        path: '/super-admin/tenants',        icon: Building2 },
-  { label: 'Subscriptions',  path: '/super-admin/subscriptions',  icon: CreditCard },
-  { label: 'Audit Logs',     path: '/super-admin/audit-logs',     icon: FileText },
+  { label: 'Dashboard',      path: '/super-admin',                    icon: LayoutDashboard },
+  { label: 'Tenants',        path: '/super-admin/tenants',             icon: Building2 },
+  { label: 'Subscriptions',  path: '/super-admin/subscriptions',       icon: CreditCard },
+  { label: 'Test Accounts',  path: '/super-admin/test-accounts',       icon: FlaskConical },
+  { label: 'Audit Logs',     path: '/super-admin/audit-logs',          icon: FileText },
 ];
 
 function StatCard({ label, value, icon: Icon, color }) {
