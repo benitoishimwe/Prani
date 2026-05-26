@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { superAdminAPI } from '../../services/api';
-import { Building2, Users, LayoutDashboard, FileText, LogOut, ShieldAlert, CreditCard, FlaskConical } from 'lucide-react';
+import { Building2, Users, LayoutDashboard, FileText, LogOut, ShieldAlert, CreditCard, FlaskConical, MessageSquare } from 'lucide-react';
 
 const NAV = [
-  { label: 'Dashboard',      path: '/super-admin',                    icon: LayoutDashboard },
-  { label: 'Tenants',        path: '/super-admin/tenants',             icon: Building2 },
-  { label: 'Subscriptions',  path: '/super-admin/subscriptions',       icon: CreditCard },
-  { label: 'Test Accounts',  path: '/super-admin/test-accounts',       icon: FlaskConical },
-  { label: 'Audit Logs',     path: '/super-admin/audit-logs',          icon: FileText },
+  { label: 'Dashboard',       path: '/super-admin',                    icon: LayoutDashboard },
+  { label: 'Tenants',         path: '/super-admin/tenants',             icon: Building2 },
+  { label: 'Subscriptions',   path: '/super-admin/subscriptions',       icon: CreditCard },
+  { label: 'Support Tickets', path: '/super-admin/support',             icon: MessageSquare },
+  { label: 'Test Accounts',   path: '/super-admin/test-accounts',       icon: FlaskConical },
+  { label: 'Audit Logs',      path: '/super-admin/audit-logs',          icon: FileText },
 ];
 
 function StatCard({ label, value, icon: Icon, color }) {
@@ -134,6 +135,12 @@ export default function SuperAdminDashboard({ children }) {
                   className="px-4 py-2 bg-[#C9A84C] text-white rounded-xl text-sm font-medium hover:bg-[#b8943f] transition-colors"
                 >
                   Manage Tenants
+                </Link>
+                <Link
+                  to="/super-admin/support"
+                  className="px-4 py-2 border border-[#EBE5DB] text-[#2D2D2D] rounded-xl text-sm font-medium hover:bg-[#F5F0E8] transition-colors"
+                >
+                  Support Tickets
                 </Link>
                 <Link
                   to="/super-admin/audit-logs"

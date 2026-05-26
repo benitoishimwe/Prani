@@ -134,6 +134,9 @@ function AppRouter() {
       <Route path="/super-admin/audit-logs" element={
         <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><AuditLogsPage /></SuperAdminDashboard></ProtectedRoute>
       } />
+      <Route path="/super-admin/support" element={
+        <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><SupportDashboard /></SuperAdminDashboard></ProtectedRoute>
+      } />
       <Route path="/super-admin/test-accounts" element={
         <ProtectedRoute roles={['super_admin']}><SuperAdminDashboard><TestAccountsPage /></SuperAdminDashboard></ProtectedRoute>
       } />
