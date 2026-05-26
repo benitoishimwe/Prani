@@ -1,5 +1,5 @@
 # Migration Verification Report
-**Project:** Prani Backend — Spring Boot 3.2.5 → Node.js 20 + Express + Prisma  
+**Project:** Plani Backend — Spring Boot 3.2.5 → Node.js 20 + Express + Prisma  
 **Generated:** 2026-05-14  
 **Status:** COMPLETE
 

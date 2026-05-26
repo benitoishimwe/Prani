@@ -169,9 +169,9 @@ export default function SettingsPage() {
 
       {/* App Info */}
       <div className="text-center py-4 text-[#5C5C5C] text-xs">
-        <p className="font-semibold" style={{fontFamily:'Playfair Display,serif'}}>Prani v2.0</p>
+        <p className="font-semibold" style={{fontFamily:'Playfair Display,serif'}}>Plani v2.0</p>
         <p>Event Planning Platform</p>
-        <p>© 2026 Prani · All rights reserved</p>
+        <p>© 2026 Plani · All rights reserved</p>
       </div>
     </div>
   );

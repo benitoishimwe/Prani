@@ -109,7 +109,7 @@ export default function BillingPage() {
       </div>
 
       {/* ── Current plan card ── */}
-      <div className="card-prani p-6 mb-6">
+      <div className="card-plani p-6 mb-6">
         <h2 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-widest mb-4">Current Plan</h2>
 
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -205,7 +205,7 @@ export default function BillingPage() {
       </div>
 
       {/* ── Invoices ── */}
-      <div className="card-prani p-6">
+      <div className="card-plani p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-widest">Payment History</h2>
           <button

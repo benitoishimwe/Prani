@@ -1,4 +1,4 @@
-# Prani — Full Application Documentation
+# Plani — Full Application Documentation
 
 > AI-powered event planning SaaS platform for African event planners, built for weddings, corporate events, birthdays, conferences, and private parties.
 
@@ -26,7 +26,7 @@
 
 ## 1. Project Overview
 
-**UbukweHub** (product name: **Prani**) is a multi-tenant SaaS platform that lets event planning businesses manage every aspect of their work. The platform owner (Archives company) sells it as a product; each subscribing business is a **tenant** with fully isolated data.
+**UbukweHub** (product name: **Plani**) is a multi-tenant SaaS platform that lets event planning businesses manage every aspect of their work. The platform owner (Archives company) sells it as a product; each subscribing business is a **tenant** with fully isolated data.
 
 Core capabilities:
 
@@ -186,7 +186,7 @@ UbukweHub/
 │   └── public/
 │       └── service-worker.js
 │
-├── prani-backend/                        # DEPRECATED — original Spring Boot backend
+├── plani-backend/                        # DEPRECATED — original Spring Boot backend
 │   └── ...                               # Do not modify; kept for reference only
 │
 ├── .env.example
@@ -234,8 +234,8 @@ PAYSTACK_SECRET_KEY=sk_live_...
 
 # Email (Resend)
 RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL=noreply@prani.app
-RESEND_FROM_NAME=Prani
+RESEND_FROM_EMAIL=noreply@plani.pro
+RESEND_FROM_NAME=Plani
 
 # Supabase Storage (file uploads)
 SUPABASE_URL=https://<project-id>.supabase.co
@@ -428,7 +428,7 @@ The remaining entities are unchanged in purpose from the previous version. All n
 
 ## 7. API Reference
 
-**Base URL:** `http://localhost:8080` (development) / `https://api.prani.app` (production)
+**Base URL:** `http://localhost:8080` (development) / `https://api.plani.pro` (production)
 
 All endpoints require `Authorization: Bearer <jwt_token>` unless marked **[public]**.
 
@@ -1109,4 +1109,4 @@ Supabase connection pooling uses Transaction mode PgBouncer on port `6543` (`DAT
 
 ---
 
-*Updated: May 2026 — UbukweHub / Prani v2.0 (Node.js + Multi-Tenant)*
+*Updated: May 2026 — UbukweHub / Plani v2.0 (Node.js + Multi-Tenant)*

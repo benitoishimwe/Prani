@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLang, LANGUAGES } from '../contexts/LanguageContext';
 import { authAPI } from '../services/api';
 import { Eye, EyeOff, Loader, Globe, Sparkles, Calendar, Users, MapPin, Briefcase, Heart, Building2 } from 'lucide-react';
+import PlaniLogo from '../components/PlaniLogo';
 
 const REGISTER_ROLES = [
   { value: 'client',        label: 'Couple / Client',    icon: Heart,      desc: 'Planning your own event' },
@@ -108,11 +109,8 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           {/* Top logo + badge */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center border border-white/20">
-                <span className="text-white font-bold text-lg" style={{fontFamily:'Poppins,sans-serif'}}>P</span>
-              </div>
-              <span className="text-xl font-bold" style={{fontFamily:'Poppins,sans-serif'}}>Prani</span>
+            <div className="flex items-center">
+              <PlaniLogo size="md" light />
             </div>
             <span className="text-xs bg-white/10 border border-white/20 backdrop-blur px-3 py-1.5 rounded-full text-white/80">
               AI-powered event planning
@@ -127,7 +125,7 @@ export default function LoginPage() {
               <br />your way.
             </h1>
             <p className="text-base text-white/75 mb-10 leading-relaxed max-w-sm">
-              Prani is the all-in-one platform for event planning businesses — from intimate weddings to large-scale corporate conferences, anywhere in the world.
+              Plani is the all-in-one platform for event planning businesses — from intimate weddings to large-scale corporate conferences, anywhere in the world.
             </p>
 
             {/* Stats grid — 2×2 on narrow, row on wide */}
@@ -160,7 +158,7 @@ export default function LoginPage() {
           <div className="w-10 h-10 rounded-xl bg-[#0F4C5C] flex items-center justify-center">
             <span className="text-white font-bold text-lg" style={{fontFamily:'Poppins,sans-serif'}}>P</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#111827]" style={{fontFamily:'Poppins,sans-serif'}}>Prani</h1>
+          <h1 className="text-2xl font-bold text-[#111827]" style={{fontFamily:'Poppins,sans-serif'}}>Plani</h1>
         </div>
 
         <div className="w-full max-w-md animate-scale-in">
@@ -190,7 +188,7 @@ export default function LoginPage() {
                     {tab === 'login' ? 'Welcome back' : 'Create account'}
                   </h2>
                   <p className="text-[#6B7280] text-sm mt-1">
-                    {tab === 'login' ? 'Sign in to your Prani workspace' : 'Start your 14-day free trial'}
+                    {tab === 'login' ? 'Sign in to your Plani workspace' : 'Start your 14-day free trial'}
                   </p>
                 </div>
 

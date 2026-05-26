@@ -61,7 +61,7 @@ const config = {
     apiKey: optionalEnv('OPENAI_API_KEY'),
   },
 
-  // ── GitHub Models (Prani API — GPT-5, DeepSeek-R1, Llama 4, Llama Vision) ──
+  // ── GitHub Models (Plani API — GPT-5, DeepSeek-R1, Llama 4, Llama Vision) ──
   github: {
     token: optionalEnv('GITHUB_TOKEN'),
   },
@@ -86,8 +86,8 @@ const config = {
   // ── Email (Resend) ───────────────────────────────────────────────────────────
   resend: {
     apiKey: optionalEnv('RESEND_API_KEY'),
-    fromEmail: optionalEnv('RESEND_FROM_EMAIL', 'noreply@prani.app'),
-    fromName: optionalEnv('RESEND_FROM_NAME', 'Prani'),
+    fromEmail: optionalEnv('RESEND_FROM_EMAIL', 'noreply@plani.pro'),
+    fromName: optionalEnv('RESEND_FROM_NAME', 'Plani'),
   },
 
   // ── Supabase Storage ─────────────────────────────────────────────────────────

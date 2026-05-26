@@ -31,7 +31,7 @@ app.use(
         return callback(null, true);
       }
       // Allow all Vercel preview deployments for this project
-      if (origin && origin.match(/^https:\/\/prani(-[a-z0-9]+)*\.vercel\.app$/)) {
+      if (origin && origin.match(/^https:\/\/plani(-[a-z0-9]+)*\.vercel\.app$/)) {
         return callback(null, true);
       }
       return callback(new Error(`CORS: origin "${origin}" is not allowed`));
@@ -86,11 +86,11 @@ app.use('/public', express.static(publicDir));
 // ── Health / root endpoints ───────────────────────────────────────────────────
 // GET /  and  GET /api/  → simple liveness response
 app.get('/', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'Prani API' });
+  res.status(200).json({ status: 'ok', service: 'Plani API' });
 });
 
 app.get('/api', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'Prani API' });
+  res.status(200).json({ status: 'ok', service: 'Plani API' });
 });
 
 // Legacy /health kept for backwards-compat; the canonical route is /api/health

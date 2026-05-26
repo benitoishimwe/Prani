@@ -1,5 +1,5 @@
 # Go-Live Checklist — Node.js Backend
-**Project:** Prani Backend  
+**Project:** Plani Backend  
 **Date:** 2026-05-14  
 **Target:** Replace Spring Boot 3.2.5 with Node.js 20 + Express + Prisma
 
@@ -40,7 +40,7 @@
 - [ ] `PAYSTACK_SECRET_KEY` — Paystack secret key
 - [ ] `RESEND_API_KEY` — Resend API key
 - [ ] `RESEND_FROM_EMAIL` — From email address
-- [ ] `RESEND_FROM_NAME` — From name (e.g., "Prani")
+- [ ] `RESEND_FROM_NAME` — From name (e.g., "Plani")
 - [ ] `SUPABASE_URL` — Supabase project URL
 - [ ] `SUPABASE_SERVICE_KEY` — Supabase service role key
 
@@ -48,7 +48,7 @@
 - [ ] `npm run dev` starts without errors
 - [ ] Server listens on correct port
 - [ ] `GET /api/health` returns `{ status: 'healthy' }`
-- [ ] `GET /` returns `{ status: 'ok', service: 'Prani API' }`
+- [ ] `GET /` returns `{ status: 'ok', service: 'Plani API' }`
 
 ---
 

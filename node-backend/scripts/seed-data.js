@@ -30,9 +30,9 @@ async function main() {
   console.log('\nCreating staff members...');
   const staffHash = await bcrypt.hash('Staff@2025!', 10);
   const staffData = [
-    { name: 'Amina Uwase', email: 'amina.uwase@prani.app', role: 'staff', skills: ['Photography', 'Decoration'], availability: 'weekends' },
-    { name: 'Jean-Pierre Habimana', email: 'jp.habimana@prani.app', role: 'staff', skills: ['Coordination', 'Guest Management'], availability: 'full-time' },
-    { name: 'Grace Mukamana', email: 'grace.mukamana@prani.app', role: 'staff', skills: ['Catering', 'Bartending'], availability: 'evenings' },
+    { name: 'Amina Uwase', email: 'amina.uwase@plani.app', role: 'staff', skills: ['Photography', 'Decoration'], availability: 'weekends' },
+    { name: 'Jean-Pierre Habimana', email: 'jp.habimana@plani.app', role: 'staff', skills: ['Coordination', 'Guest Management'], availability: 'full-time' },
+    { name: 'Grace Mukamana', email: 'grace.mukamana@plani.app', role: 'staff', skills: ['Catering', 'Bartending'], availability: 'evenings' },
   ];
   const staffUsers = [];
   for (const s of staffData) {

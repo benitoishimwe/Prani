@@ -3,7 +3,7 @@ import axios from 'axios';
 const BASE_URL = process.env.REACT_APP_BACKEND_URL;
 export const API_BASE = `${BASE_URL}/api`;
 
-const TOKEN_KEY = 'prani_token';
+const TOKEN_KEY = 'plani_token';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -301,4 +301,29 @@ export const aiAPI = {
   budget: (data) => api.post('/ai/budget', data),
   vendors: (data) => api.post('/ai/vendors', data),
   chat: (data) => api.post('/ai/chat', data),
+};
+
+// Guest Check-in (admin)
+export const guestCheckinAPI = {
+  getQr:       (eventId)          => api.get(`/events/${eventId}/guest-qr`),
+  toggle:      (eventId, enabled) => api.patch(`/events/${eventId}/guest-checkin-toggle`, { enabled }),
+  getCheckins: (eventId)          => api.get(`/events/${eventId}/guest-checkins`),
+};
+
+// Support
+export const supportAPI = {
+  // Chatbot
+  chat:                 (data)     => api.post('/support/chat', data),
+  publicChat:           (data)     => api.post('/public/support/chat', data),
+  getChatHistory:       ()         => api.get('/support/chat/conversation'),
+  // Tickets (user)
+  createTicket:         (data)     => api.post('/support/ticket', data),
+  createPublicTicket:   (data)     => api.post('/public/support/ticket', data),
+  myTickets:            ()         => api.get('/support/tickets/mine'),
+  replyTicket:          (id, msg)  => api.post(`/support/tickets/${id}/reply`, { message: msg }),
+  getMessages:          (id)       => api.get(`/support/tickets/${id}/messages`),
+  // Admin
+  listTickets:          (params)   => api.get('/support/tickets', { params }),
+  getTicket:            (id)       => api.get(`/support/tickets/${id}`),
+  updateStatus:         (id, data) => api.patch(`/support/tickets/${id}/status`, data),
 };

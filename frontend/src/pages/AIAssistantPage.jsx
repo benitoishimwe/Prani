@@ -56,7 +56,7 @@ function MetricRow({ name, data, expanded, onToggle }) {
 function ChatInterface() {
   const { t } = useLang();
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: 'Hello! I\'m your Prani AI assistant. I can help you with wedding planning, inventory, staff coordination, and more. What would you like to know?' }
+    { role: 'assistant', text: 'Hello! I\'m your Plani AI assistant. I can help you with wedding planning, inventory, staff coordination, and more. What would you like to know?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -383,7 +383,7 @@ export default function AIAssistantPage() {
               <Sparkles size={16} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold text-[#2D2D2D]">Prani AI</p>
+              <p className="text-sm font-bold text-[#2D2D2D]">Plani AI</p>
               <p className="text-xs text-[#4A7C59]">● Online · GPT-4o</p>
             </div>
           </div>

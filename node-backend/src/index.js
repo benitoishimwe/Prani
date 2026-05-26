@@ -82,7 +82,7 @@ server.listen(config.port, () => {
   startScheduler();
   console.log('');
   console.log('╔══════════════════════════════════════════════════╗');
-  console.log('║           Prani Backend — Node.js                ║');
+  console.log('║           Plani Backend — Node.js                ║');
   console.log('╠══════════════════════════════════════════════════╣');
   console.log(`║  Environment : ${config.nodeEnv.padEnd(33)}║`);
   console.log(`║  Port        : ${String(config.port).padEnd(33)}║`);

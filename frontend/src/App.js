@@ -40,6 +40,11 @@ import TenantDetailsPage from './pages/super-admin/TenantDetailsPage';
 import AuditLogsPage from './pages/super-admin/AuditLogsPage';
 import SubscriptionsPage from './pages/super-admin/SubscriptionsPage';
 import TestAccountsPage from './pages/super-admin/TestAccountsPage';
+import GuestCheckinPage from './pages/GuestCheckinPage';
+import SupportCenter from './pages/SupportCenter';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsPage from './pages/TermsPage';
+import SupportDashboard from './pages/admin/SupportDashboard';
 import { Toaster } from 'sonner';
 import { registerServiceWorker } from './services/offline';
 import './App.css';
@@ -75,6 +80,9 @@ function AppRouter() {
       <Route path="/accept-invitation"  element={<AcceptInvitationPage />} />
       <Route path="/marketplace"        element={<MarketplacePage />} />
       <Route path="/card/:designId"     element={<PublicSaveTheDatePage />} />
+      <Route path="/guest/checkin/:eventId" element={<GuestCheckinPage />} />
+      <Route path="/privacy-policy"       element={<PrivacyPolicyPage />} />
+      <Route path="/terms"                element={<TermsPage />} />
 
       {/* Onboarding */}
       <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizardPage /></ProtectedRoute>} />
@@ -96,8 +104,14 @@ function AppRouter() {
       <Route path="/messages"           element={<Wrap><MessagesPage /></Wrap>} />
       <Route path="/billing"            element={<Wrap><BillingPage /></Wrap>} />
       <Route path="/events/:eventId/album" element={<Wrap><AlbumGalleryPage /></Wrap>} />
+      <Route path="/support"             element={<Wrap><SupportCenter /></Wrap>} />
 
       {/* Admin */}
+      <Route path="/admin/support" element={
+        <ProtectedRoute roles={['tenant_admin', 'super_admin']}>
+          <Layout><SupportDashboard /></Layout>
+        </ProtectedRoute>
+      } />
       <Route path="/admin" element={
         <ProtectedRoute roles={['tenant_admin', 'super_admin', 'event_manager']}>
           <Layout><AdminPage /></Layout>

@@ -157,7 +157,7 @@ function httpRequest(url, method, token) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(bold('\n🔍  Prani Feature Validation Report'));
+  console.log(bold('\n🔍  Plani Feature Validation Report'));
   console.log(dim(`  Backend: ${BACKEND_URL}`));
   console.log(dim(`  Frontend src: ${FRONTEND_SRC}`));
   console.log(dim(`  Auth token: ${ADMIN_TOKEN ? 'provided' : 'none (live checks will get 401)'}\n`));

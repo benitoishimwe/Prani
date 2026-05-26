@@ -1,4 +1,4 @@
-# Prani Node.js Backend
+# Plani Node.js Backend
 **Stack:** Node.js 20 · Express.js · Prisma ORM · PostgreSQL (Supabase)  
 **Migrated from:** Spring Boot 3.2.5
 
@@ -215,7 +215,7 @@ See `.env.example` for the full list. Critical variables:
 ```bash
 # Using PM2 (recommended):
 npm install -g pm2
-pm2 start src/index.js --name prani-backend --instances 2
+pm2 start src/index.js --name plani-backend --instances 2
 pm2 save
 pm2 startup
 ```

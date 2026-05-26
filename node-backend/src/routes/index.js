@@ -42,6 +42,8 @@ const superAdminRoutes   = require('./super-admin.routes');
 const messagesRoutes       = require('./messages.routes');
 const notificationRoutes   = require('./notification.routes');
 const apiKeysRoutes        = require('./apiKeys.routes');
+const guestCheckinRoutes   = require('./guestCheckin.routes');
+const supportRoutes        = require('./support.routes');
 
 const router = Router();
 
@@ -102,5 +104,7 @@ router.use('/super-admin',    superAdminRoutes);
 router.use('/messages',       messagesRoutes);
 router.use('/notifications',  notificationRoutes);
 router.use('/api-keys',       apiKeysRoutes);
+router.use('/',               guestCheckinRoutes);
+router.use('/',               supportRoutes);
 
 module.exports = router;

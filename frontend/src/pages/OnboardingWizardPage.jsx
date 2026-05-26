@@ -18,7 +18,7 @@ const PLANS = [
     name: 'Free',
     price: '$0',
     period: '',
-    description: 'Perfect for exploring Prani with no commitment.',
+    description: 'Perfect for exploring Plani with no commitment.',
     icon: Zap,
     iconColor: '#6B7280',
     features: ['1 active event', '3 team members', 'Basic inventory', 'Guest photo album', 'Email support'],
@@ -113,7 +113,7 @@ function BrandingStep({ data, onChange }) {
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-xl font-bold text-[#2D2D2D]">Set up your workspace</h2>
-        <p className="text-sm text-[#6B7280] mt-1">Personalise Prani for your business.</p>
+        <p className="text-sm text-[#6B7280] mt-1">Personalise Plani for your business.</p>
       </div>
       <div>
         <label className="block text-xs font-semibold text-[#5C5C5C] mb-1">Business Name</label>
@@ -389,7 +389,7 @@ export default function OnboardingWizardPage() {
   };
 
   const markOnboarded = () => {
-    localStorage.setItem('prani_onboarded_' + (tenantId ?? user?.userId), '1');
+    localStorage.setItem('plani_onboarded_' + (tenantId ?? user?.userId), '1');
   };
 
   const skip = () => {
@@ -445,7 +445,7 @@ export default function OnboardingWizardPage() {
             <div className="w-8 h-8 bg-[#0F4C5C] rounded-lg flex items-center justify-center">
               <span className="text-white text-sm font-bold">P</span>
             </div>
-            <span className="font-bold text-[#111827]" style={{ fontFamily: 'Poppins,sans-serif' }}>Prani</span>
+            <span className="font-bold text-[#111827]" style={{ fontFamily: 'Poppins,sans-serif' }}>Plani</span>
           </div>
           <button onClick={skip} className="text-xs text-[#9A9A9A] hover:text-[#5C5C5C] transition-colors">
             Skip setup

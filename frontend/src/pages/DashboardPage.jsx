@@ -41,7 +41,7 @@ export default function DashboardPage() {
     (async () => {
       // Sync any unsynced demo shifts from localStorage before fetching stats
       const todayStr = new Date().toDateString();
-      let demoShifts = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
+      let demoShifts = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
       const unsyncedToday = demoShifts.filter(s => s.staffId && s.date && new Date(s.date).toDateString() === todayStr);
       for (const demo of unsyncedToday) {
         try {
@@ -52,7 +52,7 @@ export default function DashboardPage() {
             eventId: demo.eventId || null,
           });
           demoShifts = demoShifts.filter(s => s.shiftId !== demo.shiftId);
-          localStorage.setItem('prani_demo_shifts', JSON.stringify(demoShifts));
+          localStorage.setItem('plani_demo_shifts', JSON.stringify(demoShifts));
         } catch { /* still offline — will retry next time */ }
       }
 
@@ -62,7 +62,7 @@ export default function DashboardPage() {
       ]);
 
       // Also count any remaining unsynced today demo shifts that couldn't be persisted
-      const remainingDemo = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
+      const remainingDemo = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
       const localOnDuty = new Set(
         remainingDemo.filter(s => s.staffId && s.date && new Date(s.date).toDateString() === todayStr).map(s => s.staffId)
       ).size;

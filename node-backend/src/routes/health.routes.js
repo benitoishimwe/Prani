@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/', (req, res) => {
   return res.status(200).json({
     status: 'healthy',
-    service: 'prani-backend',
+    service: 'plani-backend',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
   });

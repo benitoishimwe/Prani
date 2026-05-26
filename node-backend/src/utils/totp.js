@@ -24,10 +24,10 @@ function generateSecret() {
  *
  * @param {string} email   - Account label shown in the authenticator app
  * @param {string} secret  - Base32 TOTP secret
- * @param {string} issuer  - App / service name (e.g. "Prani")
+ * @param {string} issuer  - App / service name (e.g. "Plani")
  * @returns {string} otpauth URI
  */
-function generateQrUri(email, secret, issuer = 'Prani') {
+function generateQrUri(email, secret, issuer = 'Plani') {
   return authenticator.keyuri(email, issuer, secret);
 }
 

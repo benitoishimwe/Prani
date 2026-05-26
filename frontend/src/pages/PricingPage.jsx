@@ -12,7 +12,7 @@ const PLANS = [
     icon: Zap,
     monthlyPrice: 0,
     yearlyPrice: 0,
-    desc: 'Perfect for exploring Prani with no commitment.',
+    desc: 'Perfect for exploring Plani with no commitment.',
     features: [
       { label: '1 active event', ok: true },
       { label: '3 team members', ok: true },
@@ -358,7 +358,7 @@ export default function PricingPage() {
       </div>
 
       {showMatrix && (
-        <div className="card-prani overflow-hidden mb-10 animate-fade-in">
+        <div className="card-plani overflow-hidden mb-10 animate-fade-in">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -396,10 +396,10 @@ export default function PricingPage() {
       )}
 
       {/* Payment methods note */}
-      <div className="card-prani p-6 text-center animate-fade-in">
+      <div className="card-plani p-6 text-center animate-fade-in">
         <h3 className="font-semibold text-[#111827] mb-2" style={{fontFamily:'Poppins,sans-serif'}}>Payment methods</h3>
         <p className="text-sm text-[#6B7280] max-w-lg mx-auto">
-          Prani supports <strong>Stripe</strong> for credit/debit cards (Visa, Mastercard, Amex) and
+          Plani supports <strong>Stripe</strong> for credit/debit cards (Visa, Mastercard, Amex) and
           <strong> Paystack</strong> for mobile money (M-Pesa, Airtel Money, MTN MoMo) and local African bank cards.
           All payments are secure and encrypted.
         </p>

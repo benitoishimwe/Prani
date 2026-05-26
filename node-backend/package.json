@@ -1,7 +1,7 @@
 {
-  "name": "prani-backend",
+  "name": "plani-backend",
   "version": "1.0.0",
-  "description": "Prani AI-powered event planning platform — Node.js backend",
+  "description": "Plani AI-powered event planning platform — Node.js backend",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

@@ -8,7 +8,7 @@ export const STAFF_ROLE          = 'staff';
 export const CLIENT_ROLE         = 'client';
 export const VENDOR_ROLE         = 'vendor';
 
-const TOKEN_KEY = 'prani_token';
+const TOKEN_KEY = 'plani_token';
 
 const AuthContext = createContext(null);
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;

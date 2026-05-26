@@ -17,7 +17,7 @@ const LangContext = createContext(null);
 
 export function LanguageProvider({ children }) {
   const [lang, setLang] = useState(() => {
-    const saved = localStorage.getItem('prani_lang');
+    const saved = localStorage.getItem('plani_lang');
     return translations[saved] ? saved : 'en';
   });
 
@@ -36,7 +36,7 @@ export function LanguageProvider({ children }) {
   const switchLang = (newLang) => {
     if (!translations[newLang]) return;
     setLang(newLang);
-    localStorage.setItem('prani_lang', newLang);
+    localStorage.setItem('plani_lang', newLang);
   };
 
   return (

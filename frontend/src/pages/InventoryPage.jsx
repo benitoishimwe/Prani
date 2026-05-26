@@ -670,7 +670,7 @@ export default function InventoryPage() {
             <h3 className="text-lg font-bold mb-1 text-[#2D2D2D]">Scan QR Code</h3>
             <p className="text-sm text-[#5C5C5C] mb-4">Enter the QR code or barcode to look up an item.</p>
             <form onSubmit={handleScan} className="space-y-3">
-              <input className="input-wedding text-center font-mono text-lg tracking-widest" placeholder="PRANI-XXXXXXXX" value={scanInput} onChange={(e) => setScanInput(e.target.value.toUpperCase())} autoFocus data-testid="qr-input" />
+              <input className="input-wedding text-center font-mono text-lg tracking-widest" placeholder="PLANI-XXXXXXXX" value={scanInput} onChange={(e) => setScanInput(e.target.value.toUpperCase())} autoFocus data-testid="qr-input" />
               <button type="submit" className="btn-gold w-full h-11 text-sm" data-testid="qr-search-btn">Find Item</button>
             </form>
           </div>

@@ -56,7 +56,7 @@ export default function ReportsPage() {
   const handleExportJSON = () => {
     const data = {
       generated_at: new Date().toISOString(),
-      platform: 'Prani',
+      platform: 'Plani',
       stats,
       transaction_stats: txStats,
       inventory_stats: invStats,
@@ -65,7 +65,7 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `prani-report-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `plani-report-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   };
 
@@ -90,7 +90,7 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `prani-report-${date}.csv`;
+    a.download = `plani-report-${date}.csv`;
     a.click();
   };
 

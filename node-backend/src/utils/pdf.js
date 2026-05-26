@@ -51,7 +51,7 @@ function generateEventReport(event, tasks = []) {
       margins: { top: 50, bottom: 50, left: 50, right: 50 },
       info: {
         Title: `Event Report — ${event.name}`,
-        Author: 'Prani Platform',
+        Author: 'Plani Platform',
         Subject: 'Event Report',
         CreationDate: new Date(),
       },
@@ -78,7 +78,7 @@ function generateEventReport(event, tasks = []) {
       .fontSize(10)
       .fillColor('#A5B4FC')
       .font('Helvetica')
-      .text('Prani — Intelligent Event Planning', 50, 58);
+      .text('Plani — Intelligent Event Planning', 50, 58);
 
     // Report generation timestamp (top-right)
     doc
@@ -279,7 +279,7 @@ function generateEventReport(event, tasks = []) {
       .fillColor(GREY_TEXT)
       .font('Helvetica')
       .text(
-        'Prani — AI-Powered Event Planning Platform  |  Confidential',
+        'Plani — AI-Powered Event Planning Platform  |  Confidential',
         50,
         footerY,
         { width: pageWidth, align: 'center' }

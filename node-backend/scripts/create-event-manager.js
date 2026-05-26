@@ -15,7 +15,7 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 const ADMIN_EMAIL    = 'benishimwe31@gmail.com';
-const EM_EMAIL       = 'eventmanager@prani.com';
+const EM_EMAIL       = 'eventmanager@plani.com';
 const EM_PASSWORD    = 'EventManager@2025';
 const EM_NAME        = 'Event Manager';
 

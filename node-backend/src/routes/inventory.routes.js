@@ -187,7 +187,7 @@ router.get('/:itemId/qrcode', authenticate, async (req, res, next) => {
     const buffer = await inventoryService.generateItemQrCode(req.params.itemId, tenantId);
 
     res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Content-Disposition', `attachment; filename="PRANI-QR-${req.params.itemId}.png"`);
+    res.setHeader('Content-Disposition', `attachment; filename="PLANI-QR-${req.params.itemId}.png"`);
     res.setHeader('Content-Length', buffer.length);
     return res.end(buffer);
   } catch (err) {

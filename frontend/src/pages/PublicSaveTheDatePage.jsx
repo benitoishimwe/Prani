@@ -58,12 +58,12 @@ export default function PublicSaveTheDatePage() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center p-4 py-12">
-      {/* Prani branding */}
+      {/* Plani branding */}
       <div className="mb-8 flex items-center gap-2">
         <div className="w-7 h-7 rounded-lg bg-[#0F4C5C] flex items-center justify-center">
           <span className="text-white font-bold text-xs" style={{ fontFamily: 'Poppins,sans-serif' }}>P</span>
         </div>
-        <span className="text-sm font-semibold text-[#0F4C5C]" style={{ fontFamily: 'Poppins,sans-serif' }}>Prani</span>
+        <span className="text-sm font-semibold text-[#0F4C5C]" style={{ fontFamily: 'Poppins,sans-serif' }}>Plani</span>
       </div>
 
       {/* Card */}
@@ -167,7 +167,7 @@ export default function PublicSaveTheDatePage() {
 
       {/* Footer */}
       <p className="mt-8 text-xs text-[#9CA3AF]">
-        Created with <span className="text-[#0F4C5C] font-semibold">Prani</span> · Event Planning Platform
+        Created with <span className="text-[#0F4C5C] font-semibold">Plani</span> · Event Planning Platform
       </p>
     </div>
   );

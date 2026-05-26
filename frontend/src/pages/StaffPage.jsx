@@ -631,7 +631,7 @@ export default function StaffPage() {
     const realShifts = shRes.status === 'fulfilled'
       ? (shRes.value.data?.shifts || shRes.value.data?.data || [])
       : [];
-    let demoShifts = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
+    let demoShifts = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
 
     // Auto-persist demo shifts that already have a staffId assigned
     const unsynced = demoShifts.filter(s => s.staffId);
@@ -644,7 +644,7 @@ export default function StaffPage() {
           eventId: demo.eventId || null,
         });
         demoShifts = demoShifts.filter(s => s.shiftId !== demo.shiftId);
-        localStorage.setItem('prani_demo_shifts', JSON.stringify(demoShifts));
+        localStorage.setItem('plani_demo_shifts', JSON.stringify(demoShifts));
         realShifts.push(data);
       } catch {
         // still offline or backend error — leave in localStorage
@@ -667,8 +667,8 @@ export default function StaffPage() {
       endTime:   demoShift.endTime   || null,
       eventId:   demoShift.eventId   || null,
     });
-    const demo = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
-    localStorage.setItem('prani_demo_shifts', JSON.stringify(demo.filter(s => s.shiftId !== demoShift.shiftId)));
+    const demo = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
+    localStorage.setItem('plani_demo_shifts', JSON.stringify(demo.filter(s => s.shiftId !== demoShift.shiftId)));
     return data;
   };
 
@@ -682,8 +682,8 @@ export default function StaffPage() {
           setShifts(prev => prev.map(s => s.shiftId === shiftId ? realShift : s));
           toast.success('Shift saved to database');
         } catch {
-          const demo = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
-          localStorage.setItem('prani_demo_shifts', JSON.stringify(
+          const demo = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
+          localStorage.setItem('plani_demo_shifts', JSON.stringify(
             demo.map(s => s.shiftId === shiftId ? { ...s, staffId, staffName } : s)
           ));
           toast.warning('Assignment saved locally — will sync when server is available');
@@ -705,8 +705,8 @@ export default function StaffPage() {
           return;
         } catch {}
       }
-      const demo = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
-      localStorage.setItem('prani_demo_shifts', JSON.stringify(demo.map(s => s.shiftId === shiftId ? { ...s, ...fields } : s)));
+      const demo = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
+      localStorage.setItem('plani_demo_shifts', JSON.stringify(demo.map(s => s.shiftId === shiftId ? { ...s, ...fields } : s)));
     } else {
       await staffAPI.updateShift(shiftId, fields);
     }
@@ -715,8 +715,8 @@ export default function StaffPage() {
   const handleShiftDelete = async (shiftId) => {
     setShifts(prev => prev.filter(s => s.shiftId !== shiftId));
     if (shiftId.startsWith('demo-')) {
-      const demo = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
-      localStorage.setItem('prani_demo_shifts', JSON.stringify(demo.filter(s => s.shiftId !== shiftId)));
+      const demo = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
+      localStorage.setItem('plani_demo_shifts', JSON.stringify(demo.filter(s => s.shiftId !== shiftId)));
     } else {
       await staffAPI.deleteShift(shiftId);
     }
@@ -784,8 +784,8 @@ export default function StaffPage() {
           shiftsList={shifts}
           onAssignmentChange={handleAssignmentChange}
           onShiftsGenerated={(newShifts) => {
-            const existing = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
-            localStorage.setItem('prani_demo_shifts', JSON.stringify([...existing, ...newShifts]));
+            const existing = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
+            localStorage.setItem('plani_demo_shifts', JSON.stringify([...existing, ...newShifts]));
             setShifts(prev => [...prev, ...newShifts]);
           }}
           onShiftUpdate={handleShiftUpdate}

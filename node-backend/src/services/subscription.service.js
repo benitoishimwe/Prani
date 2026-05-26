@@ -9,7 +9,7 @@ const VALID_PLANS = ['free', 'trial', 'pro', 'max', 'enterprise', 'wedding', 'st
 
 // Static pricing + display metadata per plan
 const PLAN_METADATA = {
-  free:       { price: 0,    yearlyPrice: 0,    period: '',           desc: 'Perfect for exploring Prani.',                  cta: 'Get started free',   popular: false, oneTime: false },
+  free:       { price: 0,    yearlyPrice: 0,    period: '',           desc: 'Perfect for exploring Plani.',                  cta: 'Get started free',   popular: false, oneTime: false },
   trial:      { price: 0,    yearlyPrice: 0,    period: '',           desc: 'Full access to all Pro features for 14 days.',  cta: 'Start free trial',   popular: false, oneTime: false },
   pro:        { price: 29,   yearlyPrice: 24,   period: '/month',     desc: 'For growing event planning businesses.',        cta: 'Start 14-day trial', popular: true,  oneTime: false },
   max:        { price: 79,   yearlyPrice: 66,   period: '/month',     desc: 'For large agencies and enterprise clients.',    cta: 'Start 14-day trial', popular: false, oneTime: false },

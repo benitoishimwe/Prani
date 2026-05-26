@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLang } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { eventsAPI, staffAPI, vendorsAPI } from '../../services/api';
-import { X, FileText, Loader, Users, LayoutList, Camera, Calendar, MapPin, DollarSign, UserCheck, Pencil, Save, Trash2, ClipboardList, Plus, UserCircle, CheckCircle2, Circle } from 'lucide-react';
+import { eventsAPI, staffAPI, vendorsAPI, guestCheckinAPI } from '../../services/api';
+import { X, FileText, Loader, Users, LayoutList, Camera, Calendar, MapPin, DollarSign, UserCheck, Pencil, Save, Trash2, ClipboardList, Plus, UserCircle, CheckCircle2, Circle, QrCode, Download, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STATUS_COLORS = {
@@ -60,7 +60,18 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Guest check-in state
+  const [qrData, setQrData] = useState(null);
+  const [checkins, setCheckins] = useState([]);
+  const [checkinLoading, setCheckinLoading] = useState(false);
+  const [togglingCheckin, setTogglingCheckin] = useState(false);
+  const canManageCheckin = ['tenant_admin', 'super_admin', 'event_manager'].includes(user?.role);
+
   const eventId = event.eventId || event.event_id;
+
+  useEffect(() => {
+    if (canManageCheckin) fetchQrData();
+  }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const fetchData = async () => {
@@ -293,6 +304,59 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
       setDeleting(false);
       setConfirmDelete(false);
     }
+  };
+
+  const fetchQrData = async () => {
+    if (!canManageCheckin) return;
+    setCheckinLoading(true);
+    try {
+      const [qrRes, ciRes] = await Promise.allSettled([
+        guestCheckinAPI.getQr(eventId),
+        guestCheckinAPI.getCheckins(eventId),
+      ]);
+      if (qrRes.status === 'fulfilled') setQrData(qrRes.value.data);
+      if (ciRes.status === 'fulfilled') setCheckins(ciRes.value.data || []);
+    } catch {
+      // silently fail — guest check-in is optional
+    } finally {
+      setCheckinLoading(false);
+    }
+  };
+
+  const handleToggleCheckin = async () => {
+    setTogglingCheckin(true);
+    try {
+      const { data } = await guestCheckinAPI.toggle(eventId, !qrData?.guestCheckinEnabled);
+      setQrData((prev) => ({ ...prev, guestCheckinEnabled: data.guestCheckinEnabled }));
+      toast.success(data.guestCheckinEnabled ? 'Guest check-in enabled' : 'Guest check-in disabled');
+      if (!qrData?.qrDataUrl) fetchQrData();
+    } catch {
+      toast.error('Failed to update check-in setting');
+    } finally {
+      setTogglingCheckin(false);
+    }
+  };
+
+  const handleDownloadQr = () => {
+    if (!qrData?.qrDataUrl) return;
+    const link = document.createElement('a');
+    link.href = qrData.qrDataUrl;
+    link.download = `checkin-qr-${eventId.substring(0, 8)}.png`;
+    link.click();
+  };
+
+  const handleExportCsv = () => {
+    if (!checkins.length) return;
+    const rows = [['Name', 'Email', 'Checked In At']];
+    checkins.forEach((c) => rows.push([c.guestName || '', c.email, new Date(c.checkedInAt).toLocaleString()]));
+    const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `checkins-${eventId.substring(0, 8)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -714,6 +778,99 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
               </div>
             )}
           </div>
+
+          {/* ── GUEST CHECK-IN ── */}
+          {canManageCheckin && (
+            <div>
+              <h3 className="font-bold text-[#2D2D2D] mb-3 flex items-center gap-2 text-sm">
+                <QrCode size={16} className="text-[#C9A84C]" /> Guest Check-in
+              </h3>
+
+              {checkinLoading ? (
+                <div className="flex items-center gap-2 text-sm text-[#5C5C5C]">
+                  <Loader size={14} className="animate-spin" /> Loading check-in data...
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Toggle */}
+                  <div className="flex items-center justify-between p-3 bg-[#F9F6F0] rounded-xl border border-[#EBE5DB]">
+                    <div>
+                      <p className="text-sm font-semibold text-[#2D2D2D]">Enable QR Check-in</p>
+                      <p className="text-xs text-[#5C5C5C]">Guests scan QR code and verify via email OTP</p>
+                    </div>
+                    <button
+                      onClick={handleToggleCheckin}
+                      disabled={togglingCheckin}
+                      className="flex items-center gap-1"
+                    >
+                      {qrData?.guestCheckinEnabled
+                        ? <ToggleRight size={28} className="text-[#4A7C59]" />
+                        : <ToggleLeft size={28} className="text-[#9CA3AF]" />
+                      }
+                    </button>
+                  </div>
+
+                  {/* QR code */}
+                  {qrData?.guestCheckinEnabled && qrData?.qrDataUrl && (
+                    <div className="flex flex-col sm:flex-row gap-4 items-start">
+                      <div className="border border-[#EBE5DB] rounded-xl p-3 bg-white">
+                        <img src={qrData.qrDataUrl} alt="Check-in QR Code" className="w-40 h-40" />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <p className="text-xs font-semibold text-[#5C5C5C]">Check-in URL</p>
+                        <p className="text-xs text-[#2D2D2D] break-all bg-[#F9F6F0] rounded-lg px-3 py-2 font-mono">
+                          {qrData.checkinUrl}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleDownloadQr}
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs bg-[#C9A84C] text-white rounded-lg font-semibold hover:bg-[#b8933f]"
+                          >
+                            <Download size={12} /> Download QR
+                          </button>
+                          {checkins.length > 0 && (
+                            <button
+                              onClick={handleExportCsv}
+                              className="flex items-center gap-1.5 px-3 py-2 text-xs border border-[#C9A84C] text-[#C9A84C] rounded-lg font-semibold hover:bg-[#C9A84C10]"
+                            >
+                              <Download size={12} /> Export CSV
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Checked-in guests list */}
+                  {qrData?.guestCheckinEnabled && (
+                    <div>
+                      <p className="text-xs font-semibold text-[#5C5C5C] mb-2">
+                        Checked-in Guests ({checkins.length})
+                      </p>
+                      {checkins.length === 0 ? (
+                        <p className="text-xs text-[#5C5C5C] italic">No guests have checked in yet.</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                          {checkins.map((ci) => (
+                            <div key={ci.checkinId} className="flex items-center gap-3 p-2.5 bg-[#F9F6F0] rounded-lg border border-[#EBE5DB]">
+                              <CheckCircle2 size={14} className="text-[#4A7C59] shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-[#2D2D2D] truncate">{ci.guestName || ci.email}</p>
+                                {ci.guestName && <p className="text-xs text-[#5C5C5C] truncate">{ci.email}</p>}
+                              </div>
+                              <p className="text-xs text-[#9CA3AF] shrink-0">
+                                {new Date(ci.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
       </div>

@@ -159,8 +159,8 @@ async function upgradeAdminToMax() {
     // User has no tenant — create one
     const tenant = await prisma.tenant.create({
       data: {
-        name: 'Prani Events',
-        slug: 'prani-events-' + Date.now(),
+        name: 'Plani Events',
+        slug: 'plani-events-' + Date.now(),
         subscriptionTier: 'enterprise',
         subscriptionStatus: 'active',
         isActive: true,

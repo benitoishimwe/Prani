@@ -281,7 +281,7 @@ export default function StaffDashboard() {
 
         // Merge demo shifts from localStorage assigned to this user (fallback for unsynced demo shifts)
         if (user?.userId) {
-          const demoShifts = JSON.parse(localStorage.getItem('prani_demo_shifts') || '[]');
+          const demoShifts = JSON.parse(localStorage.getItem('plani_demo_shifts') || '[]');
           const mine = demoShifts.filter((s) => s.staffId === user.userId && s.date);
           if (mine.length > 0) {
             const todayStr = new Date().toDateString();

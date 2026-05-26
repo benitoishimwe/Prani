@@ -20,7 +20,7 @@ export default function ProtectedRoute({ children, roles }) {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
             </svg>
           </div>
-          <p className="text-[#6B7280] font-medium" style={{fontFamily:'Poppins,sans-serif'}}>Loading Prani...</p>
+          <p className="text-[#6B7280] font-medium" style={{fontFamily:'Poppins,sans-serif'}}>Loading Plani...</p>
         </div>
       </div>
     );
@@ -39,7 +39,7 @@ export default function ProtectedRoute({ children, roles }) {
   if (
     user.role === TENANT_ADMIN_ROLE &&
     location.pathname !== ONBOARDING_PATH &&
-    !localStorage.getItem('prani_onboarded_' + (tenantId ?? user.userId ?? user.user_id))
+    !localStorage.getItem('plani_onboarded_' + (tenantId ?? user.userId ?? user.user_id))
   ) {
     return <Navigate to={ONBOARDING_PATH} replace />;
   }

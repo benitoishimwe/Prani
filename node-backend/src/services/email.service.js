@@ -14,6 +14,33 @@ function warnUnconfigured(to) {
   console.warn(`[email.service] Resend is not configured — skipping email to ${to}. Set RESEND_API_KEY in .env to enable emails.`);
 }
 
+/** Email-client-safe Plani logo header (no SVG — uses inline HTML). */
+function emailLogoHeader() {
+  return `
+    <div style="text-align:center;padding:24px 0 16px;">
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+        <tr>
+          <td style="background:#0F4C5C;border-radius:10px;width:40px;height:40px;text-align:center;vertical-align:middle;">
+            <span style="color:#E67E22;font-family:Arial,sans-serif;font-weight:900;font-size:20px;line-height:40px;">&#9660;</span>
+          </td>
+          <td style="padding-left:10px;vertical-align:middle;">
+            <span style="font-family:Arial,sans-serif;font-size:22px;font-weight:700;color:#0F4C5C;letter-spacing:-0.5px;">Plani</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+}
+
+const EMAIL_FOOTER = `
+  <div style="border-top:1px solid #e5e7eb;margin-top:32px;padding-top:16px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">© ${new Date().getFullYear()} Plani. All rights reserved.</p>
+    <p style="color:#9ca3af;font-size:11px;margin:4px 0 0;">
+      <a href="https://plani.pro" style="color:#9ca3af;text-decoration:none;">plani.pro</a>
+    </p>
+  </div>
+`;
+
 /**
  * Send a 6-digit OTP code to a user's email address for MFA verification.
  *
@@ -26,18 +53,20 @@ async function sendEmailOtp(to, code) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: 'Your Prani verification code',
+    subject: 'Your Plani verification code',
     html: `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
-        <h2 style="color:#1a1a2e;margin-bottom:8px;">Verification Code</h2>
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:0 24px 32px;background:#ffffff;border-radius:8px;">
+        ${emailLogoHeader()}
+        <h2 style="color:#0F4C5C;margin-bottom:8px;">Verification Code</h2>
         <p style="color:#555;margin-bottom:24px;">Use the code below to verify your identity. It expires in <strong>10 minutes</strong>.</p>
-        <div style="background:#f4f4f8;border-radius:6px;padding:20px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;color:#1a1a2e;">
+        <div style="background:#f4f4f8;border-radius:6px;padding:20px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;color:#0F4C5C;">
           ${code}
         </div>
         <p style="color:#888;font-size:13px;margin-top:24px;">If you did not request this code, please ignore this email or contact support immediately.</p>
+        ${EMAIL_FOOTER}
       </div>
     `,
-    text: `Your Prani verification code is: ${code}\n\nIt expires in 10 minutes. If you did not request this code, please ignore this email.`,
+    text: `Your Plani verification code is: ${code}\n\nIt expires in 10 minutes. If you did not request this code, please ignore this email.`,
   });
 }
 
@@ -62,26 +91,28 @@ async function sendInvitation(to, inviterName, tenantName, role, invitationLink)
   await resend.emails.send({
     from: FROM,
     to,
-    subject: `You've been invited to join ${tenantName} on Prani`,
+    subject: `You've been invited to join ${tenantName} on Plani`,
     html: `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
-        <h2 style="color:#1a1a2e;margin-bottom:8px;">You're Invited!</h2>
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:0 24px 32px;background:#ffffff;border-radius:8px;">
+        ${emailLogoHeader()}
+        <h2 style="color:#0F4C5C;margin-bottom:8px;">You're Invited!</h2>
         <p style="color:#555;margin-bottom:16px;">
-          <strong>${inviterName}</strong> has invited you to join <strong>${tenantName}</strong> on Prani as a <strong>${roleLabel}</strong>.
+          <strong>${inviterName}</strong> has invited you to join <strong>${tenantName}</strong> on Plani as a <strong>${roleLabel}</strong>.
         </p>
         <p style="color:#555;margin-bottom:24px;">Click the button below to accept the invitation and set up your account. The link expires in <strong>48 hours</strong>.</p>
         <a href="${invitationLink}"
-           style="display:inline-block;padding:12px 28px;background:#6c63ff;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
+           style="display:inline-block;padding:12px 28px;background:#0F4C5C;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
           Accept Invitation
         </a>
         <p style="color:#888;font-size:13px;margin-top:28px;">
           Or copy and paste this link into your browser:<br>
-          <a href="${invitationLink}" style="color:#6c63ff;word-break:break-all;">${invitationLink}</a>
+          <a href="${invitationLink}" style="color:#0F4C5C;word-break:break-all;">${invitationLink}</a>
         </p>
         <p style="color:#aaa;font-size:12px;margin-top:24px;">If you did not expect this invitation, you can safely ignore this email.</p>
+        ${EMAIL_FOOTER}
       </div>
     `,
-    text: `You've been invited to join ${tenantName} on Prani as ${roleLabel}.\n\n${inviterName} sent this invitation.\n\nAccept your invitation here:\n${invitationLink}\n\nThis link expires in 48 hours.`,
+    text: `You've been invited to join ${tenantName} on Plani as ${roleLabel}.\n\n${inviterName} sent this invitation.\n\nAccept your invitation here:\n${invitationLink}\n\nThis link expires in 48 hours.`,
   });
 }
 
@@ -97,26 +128,28 @@ async function sendWelcome(to, name) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: 'Welcome to Prani!',
+    subject: 'Welcome to Plani!',
     html: `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
-        <h2 style="color:#1a1a2e;margin-bottom:8px;">Welcome to Prani, ${name}!</h2>
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:0 24px 32px;background:#ffffff;border-radius:8px;">
+        ${emailLogoHeader()}
+        <h2 style="color:#0F4C5C;margin-bottom:8px;">Welcome to Plani, ${name}!</h2>
         <p style="color:#555;margin-bottom:16px;">
-          We're thrilled to have you on board. Prani helps you plan and manage events beautifully.
+          We're thrilled to have you on board. Plani helps you plan and manage events beautifully.
         </p>
         <p style="color:#555;margin-bottom:24px;">
           Get started by exploring your dashboard, creating your first event, or inviting your team.
         </p>
         <a href="${config.frontendUrl}/dashboard"
-           style="display:inline-block;padding:12px 28px;background:#6c63ff;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
+           style="display:inline-block;padding:12px 28px;background:#0F4C5C;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
           Go to Dashboard
         </a>
         <p style="color:#aaa;font-size:12px;margin-top:32px;">
-          Need help? Reply to this email or visit our support centre.
+          Need help? Reply to this email or visit our support centre at <a href="https://plani.pro/support" style="color:#0F4C5C;">plani.pro/support</a>
         </p>
+        ${EMAIL_FOOTER}
       </div>
     `,
-    text: `Welcome to Prani, ${name}!\n\nWe're thrilled to have you on board. Visit your dashboard to get started:\n${config.frontendUrl}/dashboard`,
+    text: `Welcome to Plani, ${name}!\n\nWe're thrilled to have you on board. Visit your dashboard to get started:\n${config.frontendUrl}/dashboard`,
   });
 }
 
@@ -134,13 +167,13 @@ async function sendPasswordChanged(to, name) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: 'Your Prani password was changed',
+    subject: 'Your Plani password was changed',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
         <h2 style="color:#1a1a2e;margin-bottom:8px;">Password Changed</h2>
         <p style="color:#555;margin-bottom:16px;">Hi ${name},</p>
         <p style="color:#555;margin-bottom:16px;">
-          Your Prani account password was successfully changed on <strong>${timestamp}</strong>.
+          Your Plani account password was successfully changed on <strong>${timestamp}</strong>.
         </p>
         <p style="color:#c0392b;margin-bottom:24px;">
           <strong>If you did not make this change</strong>, please contact our support team immediately and secure your account.
@@ -149,10 +182,10 @@ async function sendPasswordChanged(to, name) {
            style="display:inline-block;padding:12px 28px;background:#c0392b;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
           Contact Support
         </a>
-        <p style="color:#aaa;font-size:12px;margin-top:32px;">This is an automated security notification from Prani.</p>
+        <p style="color:#aaa;font-size:12px;margin-top:32px;">This is an automated security notification from Plani.</p>
       </div>
     `,
-    text: `Hi ${name},\n\nYour Prani account password was changed on ${timestamp}.\n\nIf you did not make this change, contact support immediately:\n${config.frontendUrl}/support`,
+    text: `Hi ${name},\n\nYour Plani account password was changed on ${timestamp}.\n\nIf you did not make this change, contact support immediately:\n${config.frontendUrl}/support`,
   });
 }
 
@@ -169,12 +202,12 @@ async function sendPasswordReset(to, name, tempPassword) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: 'Your Prani password has been reset',
+    subject: 'Your Plani password has been reset',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
         <h2 style="color:#1a1a2e;margin-bottom:8px;">Password Reset</h2>
         <p style="color:#555;margin-bottom:16px;">Hi ${name},</p>
-        <p style="color:#555;margin-bottom:16px;">An admin has reset your Prani account password. Your temporary password is:</p>
+        <p style="color:#555;margin-bottom:16px;">An admin has reset your Plani account password. Your temporary password is:</p>
         <div style="background:#f4f4f8;border-radius:6px;padding:16px 20px;text-align:center;font-size:22px;font-weight:700;color:#1a1a2e;letter-spacing:2px;margin-bottom:16px;">
           ${tempPassword}
         </div>
@@ -186,7 +219,7 @@ async function sendPasswordReset(to, name, tempPassword) {
         <p style="color:#aaa;font-size:12px;margin-top:32px;">If you did not expect this, please contact your organisation admin.</p>
       </div>
     `,
-    text: `Hi ${name},\n\nAn admin has reset your Prani account password.\n\nTemporary password: ${tempPassword}\n\nPlease log in and change this password immediately:\n${config.frontendUrl}/login`,
+    text: `Hi ${name},\n\nAn admin has reset your Plani account password.\n\nTemporary password: ${tempPassword}\n\nPlease log in and change this password immediately:\n${config.frontendUrl}/login`,
   });
 }
 
@@ -199,12 +232,12 @@ async function sendPlanGranted(to, name, plan, grantedByEmail) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: `Your Prani plan has been upgraded to ${planLabel}`,
+    subject: `Your Plani plan has been upgraded to ${planLabel}`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
         <h2 style="color:#1a1a2e;margin-bottom:8px;">Plan Upgraded</h2>
         <p style="color:#555;margin-bottom:16px;">Hi ${name},</p>
-        <p style="color:#555;margin-bottom:16px;">Great news! Your Prani account has been upgraded to the <strong>${planLabel}</strong> plan by a platform administrator.</p>
+        <p style="color:#555;margin-bottom:16px;">Great news! Your Plani account has been upgraded to the <strong>${planLabel}</strong> plan by a platform administrator.</p>
         <div style="background:#f4f4f8;border-radius:6px;padding:16px 20px;margin-bottom:24px;">
           <p style="margin:0;font-size:20px;font-weight:700;color:#c9a84c;">Plan: ${planLabel}</p>
         </div>
@@ -212,7 +245,7 @@ async function sendPlanGranted(to, name, plan, grantedByEmail) {
         <p style="color:#aaa;font-size:12px;margin-top:32px;">Questions? Reply to this email or contact ${grantedByEmail}.</p>
       </div>
     `,
-    text: `Hi ${name},\n\nYour Prani account has been upgraded to the ${planLabel} plan.\n\nVisit your dashboard:\n${config.frontendUrl}/dashboard`,
+    text: `Hi ${name},\n\nYour Plani account has been upgraded to the ${planLabel} plan.\n\nVisit your dashboard:\n${config.frontendUrl}/dashboard`,
   });
 }
 
@@ -226,7 +259,7 @@ async function sendTrialGranted(to, name, plan, trialDays, expiresAt) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: `Your ${trialDays}-day ${planLabel} trial on Prani has started`,
+    subject: `Your ${trialDays}-day ${planLabel} trial on Plani has started`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
         <h2 style="color:#1a1a2e;margin-bottom:8px;">Trial Started!</h2>
@@ -254,10 +287,10 @@ async function sendCustomEmail(to, name, subject, message, fromAdminName) {
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
         <p style="color:#555;margin-bottom:8px;">Hi ${name || to},</p>
         <div style="color:#333;line-height:1.7;margin-bottom:24px;">${safeMessage}</div>
-        <p style="color:#aaa;font-size:12px;border-top:1px solid #f0f0f0;padding-top:16px;margin-top:24px;">Sent by ${fromAdminName || 'Prani Support'} via Prani platform.</p>
+        <p style="color:#aaa;font-size:12px;border-top:1px solid #f0f0f0;padding-top:16px;margin-top:24px;">Sent by ${fromAdminName || 'Plani Support'} via Plani platform.</p>
       </div>
     `,
-    text: `Hi ${name || to},\n\n${message}\n\n— ${fromAdminName || 'Prani Support'}`,
+    text: `Hi ${name || to},\n\n${message}\n\n— ${fromAdminName || 'Plani Support'}`,
   });
 }
 
@@ -290,7 +323,7 @@ async function sendTaskAssigned(to, name, taskTitle, eventName, dashboardLink) {
            style="display:inline-block;padding:12px 28px;background:#c9a84c;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
           Go to Dashboard
         </a>
-        <p style="color:#aaa;font-size:12px;margin-top:32px;">This is an automated notification from Prani. Do not reply to this email.</p>
+        <p style="color:#aaa;font-size:12px;margin-top:32px;">This is an automated notification from Plani. Do not reply to this email.</p>
       </div>
     `,
     text: `Hi ${name},\n\nYou have been assigned a new task: ${taskTitle}${eventName ? `\nEvent: ${eventName}` : ''}\n\nView it on your dashboard:\n${dashboardLink}`,
@@ -321,19 +354,19 @@ async function sendTestAccountInvitation(to, name, loginUrl, password, plan, exp
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "You've been invited to test Prani",
+    subject: "You've been invited to test Plani",
     html: `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;background:#ffffff;border-radius:10px;">
         <div style="text-align:center;margin-bottom:28px;">
           <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:#0F4C5C;">
             <span style="color:#fff;font-weight:800;font-size:20px;font-family:Poppins,sans-serif;">P</span>
           </div>
-          <h1 style="font-family:Poppins,sans-serif;color:#111827;margin:12px 0 0;font-size:22px;">Welcome to Prani</h1>
+          <h1 style="font-family:Poppins,sans-serif;color:#111827;margin:12px 0 0;font-size:22px;">Welcome to Plani</h1>
         </div>
 
         <p style="color:#374151;margin-bottom:8px;">Hi <strong>${name || to}</strong>,</p>
         <p style="color:#374151;margin-bottom:24px;">
-          You've been given access to a <strong>${planLabel} test account</strong> on Prani — the all-in-one event planning platform.
+          You've been given access to a <strong>${planLabel} test account</strong> on Plani — the all-in-one event planning platform.
           This account is active until <strong>${expiry}</strong>.
         </p>
 
@@ -349,16 +382,121 @@ async function sendTestAccountInvitation(to, name, loginUrl, password, plan, exp
 
         <a href="${loginUrl}"
            style="display:block;text-align:center;padding:14px 28px;background:#0F4C5C;color:#fff;border-radius:50px;text-decoration:none;font-weight:700;font-size:15px;margin-bottom:24px;">
-          Open Prani &rarr;
+          Open Plani &rarr;
         </a>
 
         <p style="color:#9CA3AF;font-size:12px;text-align:center;margin:0;">
-          This is a test account provided by the Prani team. It expires on ${expiry}.<br>
+          This is a test account provided by the Plani team. It expires on ${expiry}.<br>
           Questions? Reply to this email.
         </p>
       </div>
     `,
-    text: `Hi ${name || to},\n\nYou've been given a ${planLabel} test account on Prani.\n\nEmail: ${to}\nTemporary password: ${password}\n\nLogin: ${loginUrl}\n\nThis account expires on ${expiry}.`,
+    text: `Hi ${name || to},\n\nYou've been given a ${planLabel} test account on Plani.\n\nEmail: ${to}\nTemporary password: ${password}\n\nLogin: ${loginUrl}\n\nThis account expires on ${expiry}.`,
+  });
+}
+
+/**
+ * Send a 6-digit OTP to a guest for event check-in.
+ */
+async function sendGuestCheckinOtp(to, code, eventName, expiryMinutes) {
+  if (!isResendConfigured) { warnUnconfigured(to); return; }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Your check-in code for ${eventName}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
+        <h2 style="color:#0F4C5C;margin-bottom:8px;">Event Check-in Code</h2>
+        <p style="color:#555;margin-bottom:8px;">You are checking in to:</p>
+        <p style="color:#0F4C5C;font-weight:700;font-size:18px;margin-bottom:20px;">${eventName}</p>
+        <p style="color:#555;margin-bottom:24px;">Enter this code to complete your check-in. It expires in <strong>${expiryMinutes} minutes</strong>.</p>
+        <div style="background:#f4f4f8;border-radius:6px;padding:20px;text-align:center;letter-spacing:10px;font-size:36px;font-weight:700;color:#0F4C5C;">
+          ${code}
+        </div>
+        <p style="color:#888;font-size:13px;margin-top:24px;">If you did not request this code, please ignore this email.</p>
+      </div>
+    `,
+    text: `Your check-in code for ${eventName} is: ${code}\n\nIt expires in ${expiryMinutes} minutes.`,
+  });
+}
+
+/**
+ * Confirm to a user that their support ticket was received.
+ */
+async function sendTicketCreated(to, name, ticketId, subject) {
+  if (!isResendConfigured) { warnUnconfigured(to); return; }
+  const displayName = name || to;
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `We received your support request: ${subject}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
+        <h2 style="color:#0F4C5C;margin-bottom:8px;">Support Request Received</h2>
+        <p style="color:#555;margin-bottom:16px;">Hi ${displayName},</p>
+        <p style="color:#555;margin-bottom:16px;">We have received your support request and our team will respond as soon as possible.</p>
+        <div style="background:#f4f4f8;border-radius:6px;padding:16px 20px;margin-bottom:24px;">
+          <p style="margin:0 0 6px;font-size:13px;color:#888;">Ticket reference</p>
+          <p style="margin:0;font-weight:700;color:#0F4C5C;font-size:15px;">#${ticketId.substring(0, 8).toUpperCase()}</p>
+          <p style="margin:6px 0 0;font-size:13px;color:#555;">Subject: ${subject}</p>
+        </div>
+        <p style="color:#888;font-size:13px;">Reply to this email to add more information to your ticket.</p>
+      </div>
+    `,
+    text: `Hi ${displayName},\n\nWe received your support request.\n\nTicket: #${ticketId.substring(0, 8).toUpperCase()}\nSubject: ${subject}\n\nWe will respond to this email address.`,
+  });
+}
+
+/**
+ * Notify internal support team about a new ticket.
+ */
+async function sendTicketCreatedInternal(to, { ticketId, email, subject, message }) {
+  if (!isResendConfigured) { warnUnconfigured(to); return; }
+  const safeMessage = String(message).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `[Support] New ticket: ${subject}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
+        <h2 style="color:#c0392b;margin-bottom:8px;">New Support Ticket</h2>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+          <tr><td style="padding:4px 0;color:#888;font-size:13px;width:100px;">Ticket ID</td><td style="color:#333;font-size:13px;">#${ticketId.substring(0, 8).toUpperCase()}</td></tr>
+          <tr><td style="padding:4px 0;color:#888;font-size:13px;">From</td><td style="color:#333;font-size:13px;">${email}</td></tr>
+          <tr><td style="padding:4px 0;color:#888;font-size:13px;">Subject</td><td style="color:#333;font-size:13px;font-weight:700;">${subject}</td></tr>
+        </table>
+        <div style="background:#f9f9f9;border-left:3px solid #c0392b;padding:12px 16px;margin-bottom:16px;color:#333;font-size:14px;line-height:1.6;">
+          ${safeMessage}
+        </div>
+        <p style="color:#aaa;font-size:12px;">Log in to the admin panel to respond to this ticket.</p>
+      </div>
+    `,
+    text: `New support ticket #${ticketId.substring(0, 8).toUpperCase()}\nFrom: ${email}\nSubject: ${subject}\n\n${message}`,
+  });
+}
+
+/**
+ * Notify a user that support staff replied to their ticket.
+ */
+async function sendTicketReply(to, subject, replyMessage, ticketId) {
+  if (!isResendConfigured) { warnUnconfigured(to); return; }
+  const safeReply = String(replyMessage).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Re: ${subject} [Ticket #${ticketId.substring(0, 8).toUpperCase()}]`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;">
+        <h2 style="color:#0F4C5C;margin-bottom:8px;">Support Reply</h2>
+        <p style="color:#888;font-size:13px;margin-bottom:20px;">Re: ${subject}</p>
+        <div style="background:#f4f4f8;border-radius:6px;padding:16px 20px;margin-bottom:24px;color:#333;font-size:14px;line-height:1.6;">
+          ${safeReply}
+        </div>
+        <p style="color:#555;font-size:13px;">You can reply to this email to continue the conversation.</p>
+        <p style="color:#aaa;font-size:12px;margin-top:24px;">Ticket reference: #${ticketId.substring(0, 8).toUpperCase()}</p>
+      </div>
+    `,
+    text: `Support reply to: ${subject}\n\n${replyMessage}\n\n---\nTicket: #${ticketId.substring(0, 8).toUpperCase()}`,
   });
 }
 
@@ -373,4 +511,8 @@ module.exports = {
   sendCustomEmail,
   sendTaskAssigned,
   sendTestAccountInvitation,
+  sendGuestCheckinOtp,
+  sendTicketCreated,
+  sendTicketCreatedInternal,
+  sendTicketReply,
 };

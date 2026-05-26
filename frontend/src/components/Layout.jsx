@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import TrialBanner from './TrialBanner';
 import NotificationBell from './NotificationBell';
+import SupportWidget from './SupportWidget';
+import PlaniLogo from './PlaniLogo';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useLang } from '../contexts/LanguageContext';
@@ -72,6 +74,9 @@ const NAV_REGISTRY = [
     roles: ['vendor'] },
 
   // ── Universal ─────────────────────────────────────────────────────────────
+  { key: 'support',        path: '/support',        label: 'Support',             icon: MessageSquare,
+    roles: ['tenant_admin', 'event_manager', 'staff', 'client'] },
+
   { key: 'settings',       path: '/settings',       labelKey: 'nav.settings',     icon: Settings,
     roles: ['tenant_admin', 'event_manager', 'staff', 'client', 'vendor'] },
 ];
@@ -113,14 +118,8 @@ export default function Layout({ children }) {
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-[#E5E7EB]">
-        <Link to="/dashboard" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-[#0F4C5C] flex items-center justify-center shadow-md group-hover:bg-[#1A6B82] transition-colors">
-            <span className="text-white font-bold text-sm" style={{fontFamily:'Poppins,sans-serif'}}>P</span>
-          </div>
-          <div>
-            <h1 className="font-bold text-[#111827] text-base" style={{fontFamily:'Poppins,sans-serif'}}>Prani</h1>
-            <p className="text-xs text-[#6B7280]">Event Planning</p>
-          </div>
+        <Link to="/dashboard" className="flex items-center gap-2 group">
+          <PlaniLogo size="md" />
         </Link>
       </div>
 
@@ -222,7 +221,7 @@ export default function Layout({ children }) {
             <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-[#E8F4F8]" data-testid="menu-btn">
               <Menu size={22} className="text-[#111827]" />
             </button>
-            <span className="font-bold text-[#111827] text-base" style={{fontFamily:'Poppins,sans-serif'}}>Prani</span>
+            <PlaniLogo size="sm" />
           </div>
           <div className="flex items-center gap-1.5">
             <NotificationBell />
@@ -271,6 +270,7 @@ export default function Layout({ children }) {
           </div>
         </nav>
       </div>
+      <SupportWidget />
     </div>
   );
 }

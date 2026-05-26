@@ -89,11 +89,11 @@ function tryParseJson(text) {
 // ─── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * GPT-5: Freeform AI chat — Prani wedding assistant.
+ * GPT-5: Freeform AI chat — Plani wedding assistant.
  */
 async function chat({ userId, message, context, eventId }) {
   const systemPrompt =
-    'You are Prani, an AI assistant for event planning in Rwanda. Help with wedding planning, vendor suggestions, budget advice, inventory, staff coordination, and scheduling. Be concise, practical, and culturally aware of Rwandan wedding traditions.';
+    'You are Plani, an AI assistant for event planning in Rwanda. Help with wedding planning, vendor suggestions, budget advice, inventory, staff coordination, and scheduling. Be concise, practical, and culturally aware of Rwandan wedding traditions.';
 
   const userContent = context
     ? `Context:\n${context}\n\nUser message:\n${message}`

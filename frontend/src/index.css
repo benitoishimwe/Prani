@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 :root {
-  /* Prani brand palette */
+  /* Plani brand palette */
   --teal:          #0F4C5C;
   --teal-dark:     #0A3545;
   --teal-mid:      #1A6B82;
@@ -103,19 +103,19 @@ h1, h2, h3, h4 {
 .stagger-4 { animation-delay: 0.4s; }
 
 /* ── CARD ── */
-.card-prani {
+.card-plani {
   background: white;
   border: 1px solid var(--border);
   border-radius: 1rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px -2px rgba(0,0,0,0.04);
   transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
-.card-prani:hover {
+.card-plani:hover {
   box-shadow: 0 4px 20px -4px rgba(15,76,92,0.15);
   transform: translateY(-1px);
 }
 /* Legacy alias */
-.card-wedding { @apply card-prani; }
+.card-wedding { @apply card-plani; }
 
 /* ── PRIMARY BUTTON ── */
 .btn-primary {
@@ -168,7 +168,7 @@ h1, h2, h3, h4 {
 }
 .input-field:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--border-focus); }
 
-/* ── INPUT WEDDING / PRANI ── */
+/* ── INPUT WEDDING / PLANI ── */
 .input-wedding {
   background: white;
   border: 1.5px solid var(--border);

@@ -6,6 +6,8 @@ import {
   QrCode, FileText, Bell, ChevronDown, ChevronUp, Menu, X
 } from 'lucide-react';
 import axios from 'axios';
+import PlaniLogo from '../components/PlaniLogo';
+import PublicChatbot from '../components/PublicChatbot';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -23,16 +25,16 @@ const FEATURES = [
 
 
 const FAQS = [
-  { q: 'Is Prani available worldwide?', a: 'Yes. Prani is built for event planners everywhere — supporting multiple currencies, languages, and local payment methods. Whether you\'re in Kigali, London, Lagos, or New York, Prani adapts to your market.' },
-  { q: 'Can I try Prani before paying?', a: 'Yes. The Free plan is available forever with no credit card required. Pro and Max plans include a 14-day free trial so you can test every feature.' },
-  { q: 'How does the AI assistant work?', a: 'Prani uses advanced AI to generate event checklists, budget breakdowns, timelines, seating plans, and vendor suggestions — all customised for your specific event type, location, and guest count.' },
+  { q: 'Is Plani available worldwide?', a: 'Yes. Plani is built for event planners everywhere — supporting multiple currencies, languages, and local payment methods. Whether you\'re in Kigali, London, Lagos, or New York, Plani adapts to your market.' },
+  { q: 'Can I try Plani before paying?', a: 'Yes. The Free plan is available forever with no credit card required. Pro and Max plans include a 14-day free trial so you can test every feature.' },
+  { q: 'How does the AI assistant work?', a: 'Plani uses advanced AI to generate event checklists, budget breakdowns, timelines, seating plans, and vendor suggestions — all customised for your specific event type, location, and guest count.' },
   { q: 'Can multiple team members use one account?', a: 'Yes. Each subscription includes team members who can be invited via email. Each person gets their own role (admin, event manager, staff, client, vendor) with appropriate permissions.' },
-  { q: 'How does Stripe / Paystack payment work?', a: 'Prani supports Stripe (credit/debit cards worldwide) and Paystack (mobile money, M-Pesa, Airtel Money, and local bank cards). You choose at checkout.' },
-  { q: 'Is my data secure and isolated?', a: 'Yes. Prani is a multi-tenant SaaS — your data is fully isolated from other businesses. All data is stored in Supabase PostgreSQL with encryption at rest and in transit.' },
+  { q: 'How does Stripe / Paystack payment work?', a: 'Plani supports Stripe (credit/debit cards worldwide) and Paystack (mobile money, M-Pesa, Airtel Money, and local bank cards). You choose at checkout.' },
+  { q: 'Is my data secure and isolated?', a: 'Yes. Plani is a multi-tenant SaaS — your data is fully isolated from other businesses. All data is stored in Supabase PostgreSQL with encryption at rest and in transit.' },
 ];
 
 const TESTIMONIALS = [
-  { name: 'Sarah Mitchell', role: 'Wedding Planner, London', text: 'Prani transformed how we run weddings. The AI checklist alone saves us 3 hours per event.', rating: 5 },
+  { name: 'Sarah Mitchell', role: 'Wedding Planner, London', text: 'Plani transformed how we run weddings. The AI checklist alone saves us 3 hours per event.', rating: 5 },
   { name: 'Marc Dubois', role: 'Corporate Events Manager, Paris', text: 'The inventory QR system is a game-changer. We finally know where all our equipment is!', rating: 5 },
   { name: 'Amara Osei', role: 'Events Director, Toronto', text: 'The vendor marketplace helped us discover 12 new partners in our first month. Incredible.', rating: 5 },
 ];
@@ -42,11 +44,8 @@ function NavBar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur border-b border-[#E5E7EB]">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#0F4C5C] flex items-center justify-center">
-            <span className="text-white font-bold text-sm" style={{fontFamily:'Poppins,sans-serif'}}>P</span>
-          </div>
-          <span className="text-lg font-bold text-[#111827]" style={{fontFamily:'Poppins,sans-serif'}}>Prani</span>
+        <Link to="/" className="flex items-center">
+          <PlaniLogo size="md" />
         </Link>
 
         {/* Desktop links */}
@@ -103,7 +102,7 @@ function HeroSection() {
               your way.
             </h1>
             <p className="text-lg sm:text-xl text-white/80 mb-10 max-w-xl leading-relaxed">
-              Prani is the all-in-one platform for event planning businesses — from intimate weddings to large-scale corporate conferences, anywhere in the world.
+              Plani is the all-in-one platform for event planning businesses — from intimate weddings to large-scale corporate conferences, anywhere in the world.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/login" className="btn-amber px-8 py-4 text-base flex items-center justify-center gap-2 shadow-lg">
@@ -157,12 +156,12 @@ function FeaturesSection() {
             One platform, every event
           </h2>
           <p className="text-[#6B7280] mt-4 max-w-xl mx-auto text-lg">
-            From a small birthday party to a 500-person corporate conference — Prani handles it all.
+            From a small birthday party to a 500-person corporate conference — Plani handles it all.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="card-prani p-6 group">
+            <div key={title} className="card-plani p-6 group">
               <div className="w-12 h-12 rounded-xl bg-[#E8F4F8] flex items-center justify-center mb-4 group-hover:bg-[#0F4C5C] transition-colors">
                 <Icon size={22} className="text-[#0F4C5C] group-hover:text-white transition-colors" />
               </div>
@@ -189,7 +188,7 @@ function AiHighlight() {
             Your AI event planning co-pilot
           </h2>
           <p className="text-[#6B7280] text-lg mb-8 leading-relaxed">
-            Prani uses Anthropic Claude — the most capable AI model available — to automate the complex thinking behind every event.
+            Plani uses Anthropic Claude — the most capable AI model available — to automate the complex thinking behind every event.
           </p>
           <div className="space-y-4">
             {[
@@ -219,7 +218,7 @@ function AiHighlight() {
               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                 <Sparkles size={16} className="text-[#E67E22]" />
               </div>
-              <span className="font-semibold" style={{fontFamily:'Poppins,sans-serif'}}>Prani AI</span>
+              <span className="font-semibold" style={{fontFamily:'Poppins,sans-serif'}}>Plani AI</span>
               <span className="tag tag-amber ml-auto text-xs">Live</span>
             </div>
             {/* Simulated AI chat */}
@@ -229,7 +228,7 @@ function AiHighlight() {
                 <p>Generate a checklist for a 200-person Rwandan wedding in Kigali</p>
               </div>
               <div className="bg-[#E67E22]/20 rounded-xl p-3 text-sm border border-[#E67E22]/30">
-                <p className="text-[#E67E22] text-xs mb-2 font-semibold">Prani AI</p>
+                <p className="text-[#E67E22] text-xs mb-2 font-semibold">Plani AI</p>
                 <p className="text-white/90 leading-relaxed">
                   Here's a comprehensive 47-item checklist for your Kigali wedding:
                 </p>
@@ -252,7 +251,7 @@ function AiHighlight() {
 
 const STATIC_PLANS = [
   {
-    key: 'free', name: 'Free', price: 0, yearlyPrice: 0, period: '', desc: 'Perfect for exploring Prani.',
+    key: 'free', name: 'Free', price: 0, yearlyPrice: 0, period: '', desc: 'Perfect for exploring Plani.',
     features: ['1 active event', '3 team members', 'Basic inventory', 'Guest photo album', 'Email support'],
     cta: 'Get started free', popular: false,
   },
@@ -382,7 +381,7 @@ function TestimonialsSection() {
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {TESTIMONIALS.map(({ name, role, text, rating }) => (
-            <div key={name} className="card-prani p-6">
+            <div key={name} className="card-plani p-6">
               <div className="flex gap-1 mb-4">
                 {Array(rating).fill(0).map((_, i) => (
                   <Star key={i} size={16} className="text-[#E67E22] fill-[#E67E22]" />
@@ -446,7 +445,7 @@ function CtaSection() {
           Ready to plan your next event?
         </h2>
         <p className="text-white/70 text-lg mb-8">
-          Join thousands of event planners worldwide already using Prani. Start free — no credit card required.
+          Join thousands of event planners worldwide already using Plani. Start free — no credit card required.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link to="/login" className="btn-amber px-8 py-4 text-base flex items-center justify-center gap-2 shadow-lg">
@@ -468,11 +467,8 @@ function Footer() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <div className="col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-[#0F4C5C] flex items-center justify-center">
-                <span className="text-white font-bold text-sm" style={{fontFamily:'Poppins,sans-serif'}}>P</span>
-              </div>
-              <span className="text-lg font-bold" style={{fontFamily:'Poppins,sans-serif'}}>Prani</span>
+            <div className="mb-4">
+              <PlaniLogo size="md" light />
             </div>
             <p className="text-sm text-white/50 leading-relaxed">
               Plan with confidence, your way. Built for event planners worldwide.
@@ -497,14 +493,14 @@ function Footer() {
           <div>
             <h4 className="font-semibold text-sm mb-4" style={{fontFamily:'Poppins,sans-serif'}}>Legal</h4>
             <ul className="space-y-2 text-sm text-white/50">
-              {['Privacy Policy', 'Terms of Service', 'Cookie Policy'].map(l => (
-                <li key={l}><a href="#" className="hover:text-white transition-colors">{l}</a></li>
-              ))}
+              <li><Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><a href="#" className="hover:text-white transition-colors">Cookie Policy</a></li>
             </ul>
           </div>
         </div>
         <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-white/40">© 2026 Prani. All rights reserved.</p>
+          <p className="text-sm text-white/40">© 2026 Plani. All rights reserved.</p>
           <div className="flex items-center gap-2 text-sm text-white/40">
             <Globe size={14} />
             Available in English & Kinyarwanda
@@ -527,6 +523,7 @@ export default function LandingPage() {
       <FaqSection />
       <CtaSection />
       <Footer />
+      <PublicChatbot />
     </div>
   );
 }

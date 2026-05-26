@@ -1,5 +1,5 @@
 # Safe Deletion Plan — Spring Boot Backend
-**Project:** Prani Backend Migration  
+**Project:** Plani Backend Migration  
 **Date:** 2026-05-14  
 **Status:** To be executed ONLY after Node.js backend is fully validated in production
 
@@ -28,12 +28,12 @@ Complete ALL of the following before deleting a single file:
 
 ```bash
 # If deployed on a VM/server:
-systemctl stop prani-backend
-systemctl disable prani-backend
+systemctl stop plani-backend
+systemctl disable plani-backend
 
 # If running in Docker:
-docker stop prani-backend-container
-docker rm prani-backend-container
+docker stop plani-backend-container
+docker rm plani-backend-container
 ```
 
 ### 1.2 Revoke Spring Boot Environment Variables
@@ -82,11 +82,11 @@ git tag archive/spring-boot-backend-v1.0 HEAD
 git push origin archive/spring-boot-backend-v1.0
 ```
 
-### 2.2 Create a ZIP Archive of prani-backend/
+### 2.2 Create a ZIP Archive of plani-backend/
 
 ```bash
 # From project root:
-zip -r prani-backend-archive-2026-05-14.zip prani-backend/
+zip -r plani-backend-archive-2026-05-14.zip plani-backend/
 ```
 
 Store this archive in a safe location (Google Drive, S3, or a long-term storage bucket) for at minimum **6 months**.
@@ -95,7 +95,7 @@ Store this archive in a safe location (Google Drive, S3, or a long-term storage 
 
 ```bash
 # Archive the .jar file if built:
-cp prani-backend/target/prani-backend-1.0.0.jar ./archives/
+cp plani-backend/target/plani-backend-1.0.0.jar ./archives/
 ```
 
 ---
@@ -105,31 +105,31 @@ cp prani-backend/target/prani-backend-1.0.0.jar ./archives/
 ### 3.1 Spring Boot Source Code — Safe to Delete
 
 ```
-prani-backend/src/
-prani-backend/target/
-prani-backend/.mvn/
-prani-backend/mvnw
-prani-backend/mvnw.cmd
-prani-backend/pom.xml
-prani-backend/lombok.config
+plani-backend/src/
+plani-backend/target/
+plani-backend/.mvn/
+plani-backend/mvnw
+plani-backend/mvnw.cmd
+plani-backend/pom.xml
+plani-backend/lombok.config
 ```
 
 **Delete command:**
 ```bash
 # After creating archive:
-rm -rf prani-backend/src
-rm -rf prani-backend/target
-rm prani-backend/pom.xml
+rm -rf plani-backend/src
+rm -rf plani-backend/target
+rm plani-backend/pom.xml
 ```
 
 ### 3.2 Files That Must NOT Be Deleted
 
 | File/Directory | Reason |
 |---|---|
-| `prani-backend/src/main/resources/db/migration/*.sql` | Database history — archive separately, do not delete from Git history |
-| `prani-backend/src/main/resources/application-local.yml` | Contains local DB credentials — verify these are not needed |
-| Git history of `prani-backend/` | Forensic record — never delete from Git history |
-| `prani-backend-archive-*.zip` | Rollback artifact |
+| `plani-backend/src/main/resources/db/migration/*.sql` | Database history — archive separately, do not delete from Git history |
+| `plani-backend/src/main/resources/application-local.yml` | Contains local DB credentials — verify these are not needed |
+| Git history of `plani-backend/` | Forensic record — never delete from Git history |
+| `plani-backend-archive-*.zip` | Rollback artifact |
 
 ---
 
@@ -165,7 +165,7 @@ rm prani-backend/pom.xml
 
 ### 4.2 Flyway History Table
 
-The Spring Boot app used a custom Flyway history table named `prani_schema_history`. This table records which SQL migrations have run. **Do not drop this table** — it is harmless and serves as a historical record. The Node.js backend uses Prisma and does not interact with this table.
+The Spring Boot app used a custom Flyway history table named `plani_schema_history`. This table records which SQL migrations have run. **Do not drop this table** — it is harmless and serves as a historical record. The Node.js backend uses Prisma and does not interact with this table.
 
 ---
 
@@ -197,7 +197,7 @@ The Spring Boot app used a custom Flyway history table named `prani_schema_histo
 **Old Dockerfile.java:**
 ```dockerfile
 FROM eclipse-temurin:21-jdk
-COPY target/prani-backend-1.0.0.jar app.jar
+COPY target/plani-backend-1.0.0.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
@@ -239,7 +239,7 @@ You can **reduce your server/container size** after migration, saving cost.
 npm install -g pm2
 
 # Start Node.js backend:
-pm2 start node-backend/src/index.js --name prani-backend --instances 2
+pm2 start node-backend/src/index.js --name plani-backend --instances 2
 
 # Auto-restart on server reboot:
 pm2 startup
@@ -265,7 +265,7 @@ If the Node.js backend has a critical issue after cutover:
 
 1. Restart the archived Spring Boot jar:
    ```bash
-   java -jar ./archives/prani-backend-1.0.0.jar \
+   java -jar ./archives/plani-backend-1.0.0.jar \
      --spring.profiles.active=prod \
      --server.port=8080
    ```
@@ -314,7 +314,7 @@ Execute this checklist in order, at least 30 days after successful go-live:
 - [ ] All Stripe webhooks confirmed pointing to Node.js
 - [ ] All environment variables confirmed in Node.js deployment
 - [ ] Documentation updated to reflect Node.js backend
-- [ ] `prani-backend/` directory removed from repository
+- [ ] `plani-backend/` directory removed from repository
 - [ ] Final commit: `chore: remove archived Spring Boot backend (migrated to Node.js)`
 
 ---

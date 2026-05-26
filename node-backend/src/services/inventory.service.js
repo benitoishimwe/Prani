@@ -11,8 +11,8 @@ function tenantScope(tenantId) {
   return tenantId ? { tenantId } : {};
 }
 
-function generatePraniCode() {
-  return `PRANI-${randomBytes(4).toString('hex').toUpperCase()}`;
+function generatePlaniCode() {
+  return `PLANI-${randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
 // ─── Service methods ──────────────────────────────────────────────────────────
@@ -70,11 +70,11 @@ async function getItemById(itemId, tenantId) {
   if (!item || !item.isActive) throw new AppError('Item not found', 404, 'ITEM_NOT_FOUND');
   if (tenantId && item.tenantId !== tenantId) throw new AppError('Item not found', 404, 'ITEM_NOT_FOUND');
 
-  // Auto-assign a PRANI code to legacy items that were seeded without one
+  // Auto-assign a PLANI code to legacy items that were seeded without one
   if (!item.qrCode) {
     item = await prisma.inventoryItem.update({
       where: { itemId },
-      data: { qrCode: generatePraniCode() },
+      data: { qrCode: generatePlaniCode() },
     });
   }
 
@@ -118,7 +118,7 @@ async function getItemByBarcode(barcode, tenantId) {
  * @param {object} params
  */
 async function createItem({ tenantId, name, category, barcode, quantity, condition, purchasePrice, rentalPrice, photos }) {
-  const qrCode = generatePraniCode();
+  const qrCode = generatePlaniCode();
   const qty = quantity !== undefined ? Number(quantity) : 0;
 
   return prisma.inventoryItem.create({

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — Deploy Prani to Railway (backend) and Vercel (frontend)
+# deploy.sh — Deploy Plani to Railway (backend) and Vercel (frontend)
 # Usage: ./deploy.sh
 # Prerequisites: railway CLI + vercel CLI logged in, SUPABASE envs in env files
 
@@ -9,7 +9,7 @@ TEAL="\033[36m"
 RESET="\033[0m"
 CHECKMARK="✓"
 
-echo -e "${TEAL}${BOLD}=== Prani Deployment Script ===${RESET}"
+echo -e "${TEAL}${BOLD}=== Plani Deployment Script ===${RESET}"
 echo ""
 
 # ─── 1. Backend → Railway ─────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ railway up --detach
 BACKEND_URL=$(railway domain 2>/dev/null | grep -o 'https://[^ ]*' | head -1)
 if [ -z "$BACKEND_URL" ]; then
   echo "  → Could not auto-detect Railway URL. Generate one in the Railway dashboard."
-  BACKEND_URL="https://prani-backend.up.railway.app"
+  BACKEND_URL="https://plani-backend.up.railway.app"
 fi
 echo -e "  ${CHECKMARK} Backend deployed: ${TEAL}${BACKEND_URL}${RESET}"
 
@@ -107,4 +107,4 @@ echo "  PAYSTACK_SECRET_KEY — sk_live_..."
 echo "  RESEND_API_KEY      — re_..."
 echo "  SUPABASE_SERVICE_KEY — eyJ..."
 echo ""
-echo -e "${TEAL}${BOLD}Prani deployment complete!${RESET}"
+echo -e "${TEAL}${BOLD}Plani deployment complete!${RESET}"

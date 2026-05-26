@@ -84,7 +84,7 @@ function UpgradeModal({ onClose, feature }) {
               Unlock {featureLabels[feature] || 'Premium Features'}
             </h2>
             <p className="mt-1 text-sm text-[#5C5C5C]">
-              Upgrade to Prani Pro to access this feature and all premium tools.
+              Upgrade to Plani Pro to access this feature and all premium tools.
             </p>
           </div>
 
