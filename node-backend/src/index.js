@@ -7,6 +7,7 @@ const http = require('http');
 const app = require('./app');
 const config = require('./config/env');
 const { disconnectPrisma } = require('./config/prisma');
+const { runMigrations } = require('./config/runMigrations');
 const { startScheduler } = require('./scheduler');
 
 const server = http.createServer(app);
@@ -78,9 +79,13 @@ process.on('uncaughtException', (err) => {
 
 // ── Start ────────────────────────────────────────────────────────────────────
 
-server.listen(config.port, () => {
-  startScheduler();
-  console.log('');
+// Run schema migrations before accepting traffic so new columns/tables exist
+runMigrations()
+  .catch((err) => console.error('[migrations] Fatal error during migrations:', err))
+  .finally(() => {
+    server.listen(config.port, () => {
+      startScheduler();
+      console.log('');
   console.log('╔══════════════════════════════════════════════════╗');
   console.log('║           Plani Backend — Node.js                ║');
   console.log('╠══════════════════════════════════════════════════╣');
@@ -89,6 +94,7 @@ server.listen(config.port, () => {
   console.log(`║  Database    : Connected via Prisma               ║`);
   console.log('╚══════════════════════════════════════════════════╝');
   console.log('');
-});
+    });
+  });
 
 module.exports = server;
