@@ -48,24 +48,25 @@ export function SubscriptionProvider({ children }) {
   const dbTrialDaysLeft = subDetails?.trialDaysLeft ?? null;
   const dbTrialExpired  = dbTrialDaysLeft !== null && dbTrialDaysLeft <= 0;
 
-  // For the default trial (no real subscription row yet), compute days remaining
-  // from the user's account creation date.
+  // Any signed-up user with no subscription row is in their automatic 14-day trial.
+  // Applies to all roles (client, event_manager, tenant_admin, etc.).
   const TRIAL_DAYS = 14;
   let defaultTrialDaysLeft = null;
-  if (!user?.tenantId && hasNoSubscriptionRow && user?.createdAt) {
+  if (hasNoSubscriptionRow && user?.createdAt) {
     const elapsed = Math.floor((Date.now() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24));
     defaultTrialDaysLeft = Math.max(0, TRIAL_DAYS - elapsed);
   }
 
-  const isClientOnDefaultTrial =
-    !user?.tenantId &&
-    currentPlan === 'free' &&
+  const isOnDefaultTrial =
     hasNoSubscriptionRow &&
     !dbTrialExpired &&
     (defaultTrialDaysLeft === null || defaultTrialDaysLeft > 0);
 
+  // Keep alias used by isFeatureEnabled below
+  const isClientOnDefaultTrial = isOnDefaultTrial;
+
   // Effective trial days left: prefer DB value (real subscription), fall back to computed
-  const trialDaysLeft = dbTrialDaysLeft ?? (isClientOnDefaultTrial ? defaultTrialDaysLeft : null);
+  const trialDaysLeft = dbTrialDaysLeft ?? (isOnDefaultTrial ? defaultTrialDaysLeft : null);
 
   const isFeatureEnabled = (featureKey) => {
     // 0. Event managers always get the planner feature regardless of plan,
@@ -89,7 +90,7 @@ export function SubscriptionProvider({ children }) {
 
   const isPro = ['pro', 'max', 'enterprise', 'trial', 'wedding'].includes(currentPlan);
   // Expose the effective trial flag so TrialBanner and other components can use it
-  const effectivelyOnTrial = isOnTrial || isClientOnDefaultTrial;
+  const effectivelyOnTrial = isOnTrial || isOnDefaultTrial;
 
   return (
     <SubscriptionContext.Provider value={{

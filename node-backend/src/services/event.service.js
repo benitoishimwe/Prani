@@ -222,7 +222,7 @@ async function createEvent({
  * @param {object} updates
  */
 async function updateEvent(eventId, tenantId, updates) {
-  const event = await prisma.event.findUnique({ where: { eventId } });
+  const event = await prisma.event.findUnique({ where: { eventId }, select: { eventId: true, tenantId: true } });
   if (!event) throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
   if (tenantId && event.tenantId !== tenantId) throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
 
@@ -236,7 +236,7 @@ async function updateEvent(eventId, tenantId, updates) {
   const data = {};
   for (const key of ALLOWED) {
     if (updates[key] !== undefined) {
-      data[key] = key === 'eventDate' && updates[key] ? new Date(updates[key]) : updates[key];
+      data[key] = updates[key];
     }
   }
 
@@ -250,7 +250,7 @@ async function updateEvent(eventId, tenantId, updates) {
  * @param {string|null} tenantId
  */
 async function deleteEvent(eventId, tenantId) {
-  const event = await prisma.event.findUnique({ where: { eventId } });
+  const event = await prisma.event.findUnique({ where: { eventId }, select: { eventId: true, tenantId: true } });
   if (!event) throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
   if (tenantId && event.tenantId !== tenantId) throw new AppError('Event not found', 404, 'EVENT_NOT_FOUND');
 

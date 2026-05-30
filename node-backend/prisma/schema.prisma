@@ -99,7 +99,7 @@ model Event {
   eventId         String    @id @default(uuid()) @map("event_id") @db.Uuid
   tenantId        String?   @map("tenant_id") @db.Uuid
   name            String
-  eventDate       DateTime? @map("event_date") @db.Timestamptz
+  eventDate       String?   @map("event_date")
   venue           String?
   clientId        String?   @map("client_id") @db.Uuid
   clientName      String?   @map("client_name")

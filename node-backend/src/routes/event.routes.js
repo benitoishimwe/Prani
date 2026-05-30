@@ -289,8 +289,18 @@ router.get('/:eventId', authenticate, async (req, res, next) => {
 // ─── PATCH /:eventId — update event ──────────────────────────────────────────
 router.patch('/:eventId', authenticate, async (req, res, next) => {
   try {
-    const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
-    const event = await eventService.updateEvent(req.params.eventId, tenantId, req.body);
+    const { role, userId, tenantId } = req.user;
+    const scopedTenantId = role === Roles.SUPER_ADMIN ? null : tenantId;
+
+    // Clients may only update their own events
+    if (role === Roles.CLIENT) {
+      const existing = await prisma.event.findUnique({ where: { eventId: req.params.eventId } });
+      if (!existing || existing.clientId !== userId) {
+        return R.notFound(res, 'Event not found');
+      }
+    }
+
+    const event = await eventService.updateEvent(req.params.eventId, scopedTenantId, req.body);
     return R.ok(res, event, 'Event updated successfully');
   } catch (err) {
     next(err);
@@ -301,11 +311,21 @@ router.patch('/:eventId', authenticate, async (req, res, next) => {
 router.delete(
   '/:eventId',
   authenticate,
-  requireRole(Roles.TENANT_ADMIN, Roles.SUPER_ADMIN),
+  requireRole(Roles.TENANT_ADMIN, Roles.SUPER_ADMIN, Roles.CLIENT),
   async (req, res, next) => {
     try {
-      const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
-      await eventService.deleteEvent(req.params.eventId, tenantId);
+      const { role, userId, tenantId } = req.user;
+      const scopedTenantId = role === Roles.SUPER_ADMIN ? null : tenantId;
+
+      // Clients may only delete their own events
+      if (role === Roles.CLIENT) {
+        const event = await prisma.event.findUnique({ where: { eventId: req.params.eventId } });
+        if (!event || event.clientId !== userId) {
+          return R.notFound(res, 'Event not found');
+        }
+      }
+
+      await eventService.deleteEvent(req.params.eventId, scopedTenantId);
       return res.status(204).end();
     } catch (err) {
       next(err);

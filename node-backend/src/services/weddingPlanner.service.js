@@ -37,7 +37,10 @@ async function getOrCreatePlan({ userId, tenantId, eventId }) {
           select: { budget: true, eventDate: true },
         });
         if (ev?.budget) seedData.totalBudget = ev.budget;
-        if (ev?.eventDate) seedData.weddingDate = ev.eventDate;
+        if (ev?.eventDate) {
+          const d = new Date(String(ev.eventDate).replace(/\+00$/, '+00:00'));
+          if (!isNaN(d)) seedData.weddingDate = d;
+        }
       } catch (_) { /* event lookup is best-effort */ }
     }
 
@@ -54,7 +57,10 @@ async function getOrCreatePlan({ userId, tenantId, eventId }) {
       });
       const syncData = { eventId };
       if (ev?.budget && !plan.totalBudget) syncData.totalBudget = ev.budget;
-      if (ev?.eventDate && !plan.weddingDate) syncData.weddingDate = ev.eventDate;
+      if (ev?.eventDate && !plan.weddingDate) {
+        const d = new Date(String(ev.eventDate).replace(/\+00$/, '+00:00'));
+        if (!isNaN(d)) syncData.weddingDate = d;
+      }
       plan = await prisma.weddingPlan.update({
         where: { planId: plan.planId },
         data: syncData,
