@@ -5,11 +5,11 @@ const prisma = require('../config/prisma');
 
 // Features included by plan tier — used as fallback when DB rows are missing
 const PLAN_FEATURES = {
-  max:        ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
-  enterprise: ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
-  pro:        ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
-  wedding:    ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'advanced_reports', 'save_the_date_image'],
-  trial:      ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
+  max:        ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+  enterprise: ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+  pro:        ['ai_assistant', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports'],
+  wedding:    ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'advanced_reports', 'save_the_date_image'],
+  trial:      ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
   free:       [],
 };
 

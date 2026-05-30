@@ -29,7 +29,8 @@ const NAV_REGISTRY = [
     roles: ['tenant_admin', 'event_manager', 'client'] },
 
   { key: 'planner',        path: '/planner',        label: 'Planner',             icon: Heart,
-    roles: ['tenant_admin', 'event_manager', 'client'] },
+    roles: ['tenant_admin', 'event_manager', 'client'],
+    featureKey: 'planner', featureExemptRoles: ['event_manager'] },
 
   { key: 'inventory',      path: '/inventory',      labelKey: 'nav.inventory',    icon: Package,
     roles: ['tenant_admin', 'event_manager', 'staff'] },
@@ -48,10 +49,12 @@ const NAV_REGISTRY = [
 
   // ── Feature-gated items ───────────────────────────────────────────────────
   { key: 'ai',             path: '/ai',             labelKey: 'nav.ai',           icon: Sparkles,
-    roles: ['tenant_admin', 'event_manager', 'client'], featureKey: 'ai_assistant' },
+    roles: ['tenant_admin', 'event_manager', 'client'], featureKey: 'ai_assistant',
+    featureExemptRoles: ['event_manager'] },
 
   { key: 'savethedate',    path: '/save-the-date',  label: 'Save the Date',       icon: Image,
-    roles: ['tenant_admin', 'event_manager'],           featureKey: 'save_the_date' },
+    roles: ['tenant_admin', 'event_manager'],           featureKey: 'save_the_date',
+    featureExemptRoles: ['event_manager'] },
 
   { key: 'reports',        path: '/reports',        labelKey: 'nav.reports',      icon: BarChart3,
     roles: ['tenant_admin'],                            featureKey: 'advanced_reports' },
@@ -94,7 +97,11 @@ function resolveLabel(item, t) {
 function buildNavItems(role, t, isFeatureEnabled) {
   return NAV_REGISTRY
     .filter(item => item.roles.includes(role))
-    .filter(item => !item.featureKey || isFeatureEnabled(item.featureKey))
+    .filter(item => {
+      if (!item.featureKey) return true;
+      if (item.featureExemptRoles?.includes(role)) return true;
+      return isFeatureEnabled(item.featureKey);
+    })
     .map(item => ({ ...item, label: resolveLabel(item, t) }));
 }
 

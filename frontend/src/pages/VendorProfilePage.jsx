@@ -1,12 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { vendorMeAPI } from '../services/api';
 import {
   User, MapPin, Phone, Globe, Instagram, Facebook,
   DollarSign, CheckCircle, AlertCircle, Edit3, Save, X,
-  Store, Star, Eye, ArrowLeft,
+  Store, Star, Eye, ArrowLeft, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+const VENDOR_CATEGORIES = [
+  'Photography', 'Videography', 'Catering', 'Venue', 'Flowers & Decor',
+  'Music & Entertainment', 'Wedding Cake', 'Transportation', 'Hair & Makeup',
+  'Event Planning', 'Lighting', 'Invitation & Stationery', 'Other',
+];
+
+const inputCls =
+  'w-full px-3 py-2.5 rounded-xl border border-[#EBE5DB] text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A84C40] focus:border-[#C9A84C] bg-white text-[#2D2D2D] placeholder-[#9CA3AF]';
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'RWF', 'KES', 'UGX', 'TZS', 'NGN', 'GHS', 'ZAR'];
 
@@ -29,11 +39,83 @@ function Field({ label, icon: Icon, children }) {
   );
 }
 
-const inputCls =
-  'w-full px-3 py-2.5 rounded-xl border border-[#EBE5DB] text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A84C40] focus:border-[#C9A84C] bg-white text-[#2D2D2D] placeholder-[#9CA3AF]';
+function VendorSetupForm({ user, onCreated, onBack }) {
+  const [form, setForm] = useState({ name: user?.name || '', category: '', phone: '', location: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.category) { setError('Please select a business category'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      await vendorMeAPI.init(form);
+      const res = await vendorMeAPI.me();
+      onCreated(res.data);
+      toast.success('Vendor profile created — welcome to Plani!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-8 max-w-lg mx-auto">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-[#5C5C5C] hover:text-[#0F4C5C] mb-6 transition-colors">
+        <ArrowLeft size={16} /> Back to Dashboard
+      </button>
+      <div className="bg-white rounded-2xl p-8 shadow-[0_4px_20px_rgb(0,0,0,0.06)]">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-[#E8F4F8] flex items-center justify-center mx-auto mb-3">
+            <User size={28} className="text-[#0F4C5C]" />
+          </div>
+          <h2 className="text-2xl font-bold text-[#2D2D2D]" style={{ fontFamily: 'Playfair Display,serif' }}>
+            Set up your vendor profile
+          </h2>
+          <p className="text-sm text-[#5C5C5C] mt-1">Takes 30 seconds — you can update details anytime</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[#5C5C5C] mb-1">Business Name</label>
+            <input className={inputCls} placeholder={user?.name || 'Your business name'} value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })} required />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[#5C5C5C] mb-1">Category <span className="text-[#D9534F]">*</span></label>
+            <select className={inputCls} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} required>
+              <option value="">Select your service type…</option>
+              {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-[#5C5C5C] mb-1">Phone <span className="text-[#9CA3AF] font-normal">(optional)</span></label>
+              <input className={inputCls} placeholder="+250 7XX XXX XXX" value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#5C5C5C] mb-1">Location <span className="text-[#9CA3AF] font-normal">(optional)</span></label>
+              <input className={inputCls} placeholder="Kigali, Rwanda" value={form.location}
+                onChange={e => setForm({ ...form, location: e.target.value })} />
+            </div>
+          </div>
+          {error && <p className="text-sm text-[#D9534F]">{error}</p>}
+          <button type="submit" disabled={loading}
+            className="w-full h-12 rounded-xl bg-[#C9A84C] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#B8962A] transition-colors disabled:opacity-60">
+            {loading ? <Loader2 size={18} className="animate-spin" /> : 'Start selling on Plani →'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function VendorProfilePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -140,20 +222,7 @@ export default function VendorProfilePage() {
   }
 
   if (noProfile) {
-    return (
-      <div className="p-4 md:p-8 max-w-3xl mx-auto">
-        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1.5 text-sm text-[#5C5C5C] hover:text-[#0F4C5C] mb-6 transition-colors">
-          <ArrowLeft size={16} /> Back to Dashboard
-        </button>
-        <div className="flex items-start gap-3 bg-[#FBE9E7] border border-[#EF9A9A] rounded-xl px-5 py-5">
-          <AlertCircle size={20} className="text-[#BF360C] flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-[#BF360C]">No vendor profile linked to your account</p>
-            <p className="text-xs text-[#BF360C] mt-0.5">Please contact an administrator to link your account to a vendor profile.</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <VendorSetupForm user={user} onCreated={(v) => { setVendor(v); setNoProfile(false); }} onBack={() => navigate('/dashboard')} />;
   }
 
   const avgRating = vendor?.rating ? Number(vendor.rating).toFixed(1) : null;

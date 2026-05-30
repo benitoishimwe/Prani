@@ -6,11 +6,11 @@ const SubscriptionContext = createContext(null);
 
 // Plans and the features they unlock — mirrors backend featureGate.js
 const PLAN_FEATURES = {
-  max:        ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
-  enterprise: ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
-  pro:        ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
-  wedding:    ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'advanced_reports', 'save_the_date_image'],
-  trial:      ['ai_assistant', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
+  max:        ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+  enterprise: ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+  pro:        ['ai_assistant', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports'],
+  wedding:    ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'advanced_reports', 'save_the_date_image'],
+  trial:      ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
   free:       [],
 };
 
@@ -38,17 +38,58 @@ export function SubscriptionProvider({ children }) {
 
   const subscription   = subDetails?.subscription  ?? null;
   const currentPlan    = subDetails?.plan           ?? 'max';
-  const trialDaysLeft  = subDetails?.trialDaysLeft  ?? null;
   const isOnTrial      = subscription?.status === 'trial';
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
+  // All standalone users (no tenant) on the free plan are in their automatic
+  // 14-day trial window. We check that no subscription row exists yet to
+  // distinguish new users from those whose trial has already expired.
+  const hasNoSubscriptionRow = subscription === null;
+  const dbTrialDaysLeft = subDetails?.trialDaysLeft ?? null;
+  const dbTrialExpired  = dbTrialDaysLeft !== null && dbTrialDaysLeft <= 0;
+
+  // For the default trial (no real subscription row yet), compute days remaining
+  // from the user's account creation date.
+  const TRIAL_DAYS = 14;
+  let defaultTrialDaysLeft = null;
+  if (!user?.tenantId && hasNoSubscriptionRow && user?.createdAt) {
+    const elapsed = Math.floor((Date.now() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24));
+    defaultTrialDaysLeft = Math.max(0, TRIAL_DAYS - elapsed);
+  }
+
+  const isClientOnDefaultTrial =
+    !user?.tenantId &&
+    currentPlan === 'free' &&
+    hasNoSubscriptionRow &&
+    !dbTrialExpired &&
+    (defaultTrialDaysLeft === null || defaultTrialDaysLeft > 0);
+
+  // Effective trial days left: prefer DB value (real subscription), fall back to computed
+  const trialDaysLeft = dbTrialDaysLeft ?? (isClientOnDefaultTrial ? defaultTrialDaysLeft : null);
+
   const isFeatureEnabled = (featureKey) => {
-    const plan = currentPlan;
-    if (PLAN_FEATURES[plan]?.includes(featureKey)) return true;
+    // 0. Event managers always get core planning features regardless of plan.
+    //    Mirrors the featureExemptRoles in Layout.jsx so page-level gates also pass.
+    const EVENT_MANAGER_ALWAYS = ['ai_assistant', 'planner', 'save_the_date'];
+    if (user?.role === 'event_manager' && EVENT_MANAGER_ALWAYS.includes(featureKey)) return true;
+
+    // 1. Use the raw subscription row's plan — always correct even when the
+    //    server-side computed `plan` is overridden by the tenant-tier bug.
+    const rawPlan = subscription?.plan;
+    if (rawPlan && PLAN_FEATURES[rawPlan]?.includes(featureKey)) return true;
+    // 2. Active trial (status === 'trial') → treat as full trial tier.
+    if (isOnTrial && PLAN_FEATURES['trial']?.includes(featureKey)) return true;
+    // 3. New standalone users on free plan get 14-day trial features automatically.
+    if (isClientOnDefaultTrial && PLAN_FEATURES['trial']?.includes(featureKey)) return true;
+    // 4. Server-computed plan fallback.
+    if (PLAN_FEATURES[currentPlan]?.includes(featureKey)) return true;
+    // 5. Per-feature DB overrides returned by the API.
     return subDetails?.features?.[featureKey] === true;
   };
 
   const isPro = ['pro', 'max', 'enterprise', 'trial', 'wedding'].includes(currentPlan);
+  // Expose the effective trial flag so TrialBanner and other components can use it
+  const effectivelyOnTrial = isOnTrial || isClientOnDefaultTrial;
 
   return (
     <SubscriptionContext.Provider value={{
@@ -56,7 +97,7 @@ export function SubscriptionProvider({ children }) {
       loading,
       currentPlan,
       isPro,
-      isOnTrial,
+      isOnTrial: effectivelyOnTrial,
       trialDaysLeft,
       cancelAtPeriodEnd,
       isFeatureEnabled,

@@ -16,12 +16,13 @@ const { AppError } = require('../middleware/errorHandler');
  * @param {number} [params.size=20]
  * @returns {Promise<{ users: object[], total: number, page: number, size: number }>}
  */
-async function listUsers({ tenantId, role, page = 1, size = 20 } = {}) {
+async function listUsers({ tenantId, role, page = 1, size = 20, includeInactive = false } = {}) {
   const skip = (page - 1) * size;
 
   const where = {};
   if (tenantId) where.tenantId = tenantId;
   if (role) where.role = role;
+  if (!includeInactive) where.isActive = true;
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({

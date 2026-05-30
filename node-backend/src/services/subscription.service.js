@@ -32,6 +32,16 @@ const FEATURE_LABELS = {
 
 const TRIAL_DAYS = 14;
 
+// Features included by plan tier — mirrors featureGate.js (fallback when DB rows are absent)
+const PLAN_FEATURES = {
+  max:        ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+  enterprise: ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'white_label', 'api_access', 'save_the_date_image'],
+  pro:        ['ai_assistant', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports'],
+  wedding:    ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'advanced_reports', 'save_the_date_image'],
+  trial:      ['ai_assistant', 'planner', 'save_the_date', 'vendor_marketplace', 'analytics', 'unlimited_events', 'advanced_reports', 'save_the_date_image'],
+  free:       [],
+};
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function _findActiveSubscription(userId) {
@@ -108,7 +118,9 @@ async function isFeatureEnabled(userId, featureKey) {
   const feature = await prisma.subscriptionFeature.findFirst({
     where: { plan, featureKey },
   });
-  return feature ? feature.isEnabled : false;
+  if (feature !== null) return feature.isEnabled;
+  // No DB override row — fall back to static plan defaults (matches featureGate.js)
+  return PLAN_FEATURES[plan]?.includes(featureKey) ?? false;
 }
 
 async function getFeatureLimit(userId, featureKey) {
@@ -122,9 +134,10 @@ async function getFeatureLimit(userId, featureKey) {
 async function getSubscriptionDetails(userId) {
   const subscription = await _findActiveSubscription(userId);
 
-  // tenants.subscriptionTier is the authoritative plan — fall back to subscription.plan
-  let plan = subscription?.plan || 'free';
-  if (userId) {
+  // Active subscription row is authoritative (matches featureGate.js priority order).
+  // Only fall back to tenant.subscriptionTier when no active subscription exists.
+  let plan = subscription?.plan ?? 'free';
+  if (!subscription && userId) {
     const user = await prisma.user.findUnique({
       where: { userId },
       select: { tenantId: true },
@@ -134,15 +147,21 @@ async function getSubscriptionDetails(userId) {
         where: { tenantId: user.tenantId },
         select: { subscriptionTier: true },
       });
-      if (tenant?.subscriptionTier) plan = tenant.subscriptionTier;
+      if (tenant?.subscriptionTier && tenant.subscriptionTier !== 'free') {
+        plan = tenant.subscriptionTier;
+      }
     }
   }
 
   const featureRows = await prisma.subscriptionFeature.findMany({ where: { plan } });
+  // Seed from static defaults so the frontend features map is never empty for known plans
+  const staticDefaults = Object.fromEntries(
+    (PLAN_FEATURES[plan] ?? []).map(k => [k, true])
+  );
   const features = featureRows.reduce((acc, row) => {
-    acc[row.featureKey] = row.isEnabled;
+    acc[row.featureKey] = row.isEnabled; // DB rows override static defaults
     return acc;
-  }, {});
+  }, staticDefaults);
 
   let trialDaysLeft = null;
   if (subscription?.status === 'trial' && subscription.trialEndsAt) {

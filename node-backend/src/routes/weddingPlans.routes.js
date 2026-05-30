@@ -1,5 +1,8 @@
 'use strict';
 
+const { randomUUID } = require('crypto');
+const { Prisma } = require('@prisma/client');
+
 /**
  * /api/wedding-plans routes
  *
@@ -29,23 +32,34 @@ router.use(authenticate);
 router.post('/', async (req, res, next) => {
   try {
     const { tenantId, userId } = req.user;
-    if (!tenantId) return R.badRequest(res, 'Tenant context required');
+    // tenantId is optional — self-serve clients have no tenant
 
     const { wedding_date, theme, total_budget, eventId } = req.body;
 
-    const plan = await prisma.weddingPlan.create({
-      data: {
-        userId,
-        tenantId,
-        eventId: eventId || null,
-        weddingDate: wedding_date ? new Date(wedding_date) : null,
-        theme: theme || null,
-        totalBudget: total_budget != null ? total_budget : null,
-      },
+    // Use raw SQL to bypass Prisma's required-relation validation on tenantId.
+    // (tenantId is nullable in the DB; the Prisma client may have the old schema cached.)
+    const planId = randomUUID();
+    const weddingDateVal = wedding_date ? new Date(wedding_date) : null;
+    const budgetVal = total_budget != null ? Number(total_budget) : null;
+
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO wedding_plans
+        (plan_id, tenant_id, user_id, event_id, wedding_date, theme, total_budget, created_at, updated_at)
+      VALUES
+        (${planId}::uuid,
+         ${tenantId || null}::uuid,
+         ${userId}::uuid,
+         ${eventId || null}::uuid,
+         ${weddingDateVal},
+         ${theme || null},
+         ${budgetVal},
+         NOW(), NOW())
+    `);
+
+    const plan = await prisma.weddingPlan.findUnique({
+      where: { planId },
       include: {
-        _count: {
-          select: { budgetItems: true, guests: true, venues: true, menuItems: true, designAssets: true },
-        },
+        _count: { select: { budgetItems: true, guests: true, venues: true, menuItems: true, designAssets: true } },
       },
     });
 
@@ -58,11 +72,11 @@ router.post('/', async (req, res, next) => {
 // GET /current — return the user's latest plan; 404 if none
 router.get('/current', async (req, res, next) => {
   try {
-    const { tenantId, userId } = req.user;
-    if (!tenantId) return R.badRequest(res, 'Tenant context required');
+    const { userId } = req.user;
+    // Scope by userId only — tenantId is optional for self-serve clients
 
     const plan = await prisma.weddingPlan.findFirst({
-      where: { userId, tenantId },
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {

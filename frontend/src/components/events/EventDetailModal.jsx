@@ -48,7 +48,8 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
   const [addingTask, setAddingTask]   = useState(false);
   const [assigningTask, setAssigningTask] = useState(null); // taskId being assigned
 
-  const canManageTasks = ['tenant_admin', 'super_admin', 'event_manager'].includes(user?.role);
+  const isClient = user?.role === 'client';
+  const canManageTasks = ['tenant_admin', 'super_admin', 'event_manager', 'client'].includes(user?.role);
 
   // Edit state
   const [editing, setEditing]   = useState(false);
@@ -78,12 +79,14 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
       setLoading(true);
       setError('');
       try {
-        const [evRes, stRes, vnRes, taskRes] = await Promise.allSettled([
+        // Clients have no tenant, so skip staff/vendor fetches to avoid 400 errors
+        const fetches = [
           eventsAPI.get(eventId),
-          staffAPI.list({ size: 100 }),
-          vendorsAPI.list({ size: 100 }),
+          isClient ? Promise.resolve(null) : staffAPI.list({ size: 100 }),
+          isClient ? Promise.resolve(null) : vendorsAPI.list({ size: 100 }),
           eventsAPI.listTasks(eventId),
-        ]);
+        ];
+        const [evRes, stRes, vnRes, taskRes] = await Promise.allSettled(fetches);
 
         if (evRes.status === 'fulfilled') {
           setDetails(evRes.value.data);
@@ -91,12 +94,12 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
           setError('Failed to load event details.');
         }
 
-        if (stRes.status === 'fulfilled') {
+        if (stRes.status === 'fulfilled' && stRes.value !== null) {
           const d = stRes.value.data;
           setAllStaff(d.staff || d.users || d.data || []);
         }
 
-        if (vnRes.status === 'fulfilled') {
+        if (vnRes.status === 'fulfilled' && vnRes.value !== null) {
           const d = vnRes.value.data;
           setAllVendors(d.vendors || d.data || []);
         }
@@ -574,8 +577,8 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
             </div>
           )}
 
-          {/* Staff & Vendor assignments */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Staff & Vendor assignments — hidden for clients (tenant-managed) */}
+          {!isClient && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
             {/* Staff */}
             <div>
@@ -653,7 +656,7 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
               </div>
             </div>
 
-          </div>
+          </div>}
 
           {/* ── TASKS ── */}
           <div>
@@ -670,16 +673,18 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                 />
-                <select
-                  className="input-wedding text-sm py-2 min-w-[140px]"
-                  value={newTaskAssignee}
-                  onChange={(e) => setNewTaskAssignee(e.target.value)}
-                >
-                  <option value="">Assign to (optional)</option>
-                  {allStaff.map((s) => (
-                    <option key={s.userId || s.user_id} value={s.userId || s.user_id}>{s.name}</option>
-                  ))}
-                </select>
+                {!isClient && (
+                  <select
+                    className="input-wedding text-sm py-2 min-w-[140px]"
+                    value={newTaskAssignee}
+                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                  >
+                    <option value="">Assign to (optional)</option>
+                    {allStaff.map((s) => (
+                      <option key={s.userId || s.user_id} value={s.userId || s.user_id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
                 <button
                   type="submit"
                   disabled={!newTaskTitle.trim() || addingTask}

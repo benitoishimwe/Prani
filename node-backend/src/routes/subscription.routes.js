@@ -21,7 +21,21 @@ router.get('/plans', async (req, res, next) => {
 // ─── GET /api/subscriptions/current (alias for /me) ──────────────────────────
 router.get('/current', authenticate, async (req, res, next) => {
   try {
-    const details = await subscriptionService.getSubscriptionDetails(req.user.userId);
+    let details = await subscriptionService.getSubscriptionDetails(req.user.userId);
+
+    // Auto-start a 14-day Max trial for any standalone user (no tenant) on the free plan.
+    // Covers clients, vendors, and any other self-registered roles.
+    // Fires once per user — startTrial throws 409 if already used.
+    const isStandalone = !req.user.tenantId;
+    if (isStandalone && details.plan === 'free') {
+      try {
+        await subscriptionService.startTrial(req.user.userId, 'max', null);
+        details = await subscriptionService.getSubscriptionDetails(req.user.userId);
+      } catch (_) {
+        // Trial already used, or not eligible — keep existing plan.
+      }
+    }
+
     return ok(res, details);
   } catch (err) {
     return next(err);

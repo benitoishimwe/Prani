@@ -50,8 +50,8 @@ const router = Router();
 // ── Event-scoped album routes (/events/:eventId/albums) ───────────────────────
 router.post('/events/:eventId/albums', authenticate, async (req, res, next) => {
   try {
-    const tenantId = req.user.tenantId;
-    if (!tenantId) return R.badRequest(res, 'Tenant context required');
+    // tenantId is optional — self-serve clients (no tenant) can also create albums
+    const tenantId = req.user.tenantId || null;
     const { title, description, maxFileSizeMb, allowVideos } = req.body;
     const album = await albumService.createAlbum({
       tenantId,
@@ -68,11 +68,14 @@ router.post('/events/:eventId/albums', authenticate, async (req, res, next) => {
 
 router.get('/events/:eventId/albums', authenticate, async (req, res, next) => {
   try {
-    const tenantId = req.user.tenantId;
-    if (!tenantId) return R.badRequest(res, 'Tenant context required');
+    // tenantId is optional — scope by eventId alone when the user has no tenant
+    const tenantId = req.user.tenantId || null;
 
-    // Return first album for this event with all its media — shape: { album, media, media_count }
-    const { data: albums } = await albumService.listAlbums({ tenantId, eventId: req.params.eventId, size: 1 });
+    const { data: albums } = await albumService.listAlbums({
+      tenantId,
+      eventId: req.params.eventId,
+      size: 1,
+    });
     if (!albums || albums.length === 0) {
       return R.notFound(res, 'No album for this event');
     }
