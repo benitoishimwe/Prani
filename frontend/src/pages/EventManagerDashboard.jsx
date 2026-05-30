@@ -108,16 +108,16 @@ export default function EventManagerDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <StatCard
           icon={Calendar}
-          label="Active Events"
-          value={loading ? '…' : (stats.active ?? 0)}
-          sub={`${stats.planning ?? 0} in planning`}
+          label="My Events"
+          value={loading ? '…' : ((stats.active ?? 0) + (stats.planning ?? 0) + (stats.confirmed ?? 0))}
+          sub={`${stats.completed ?? 0} completed`}
           color="bg-[#C9A84C]"
         />
         <StatCard
           icon={CheckSquare}
           label="Completed"
           value={loading ? '…' : (stats.completed ?? 0)}
-          sub="All time"
+          sub={`${stats.total ?? 0} total`}
           color="bg-[#4A7C59]"
         />
         <StatCard
@@ -177,7 +177,7 @@ export default function EventManagerDashboard() {
             <div className="space-y-3">
               {upcomingEvents.map((event) => (
                 <div
-                  key={event.event_id ?? event.id}
+                  key={event.eventId ?? event.event_id}
                   onClick={() => navigate('/events')}
                   className="flex items-center justify-between py-3 px-4 rounded-xl bg-[#F9F9FB] hover:bg-[#F0F0F5] cursor-pointer transition-colors"
                   data-testid="event-row"
@@ -190,16 +190,16 @@ export default function EventManagerDashboard() {
                       <p className="text-sm font-semibold text-[#2D2D2D] truncate">{event.name}</p>
                       <p className="text-xs text-[#5C5C5C] flex items-center gap-1">
                         {event.venue && <><MapPin size={10} /> {event.venue} · </>}
-                        {event.event_date
-                          ? new Date(event.event_date).toLocaleDateString()
+                        {(event.eventDate || event.event_date)
+                          ? new Date(event.eventDate ?? event.event_date).toLocaleDateString()
                           : 'No date set'}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {event.guest_count && (
+                    {(event.guestCount ?? event.guest_count) > 0 && (
                       <span className="text-xs text-[#5C5C5C] hidden sm:inline">
-                        {event.guest_count} guests
+                        {event.guestCount ?? event.guest_count} guests
                       </span>
                     )}
                     <StatusBadge status={event.status} />

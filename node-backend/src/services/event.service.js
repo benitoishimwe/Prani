@@ -410,20 +410,35 @@ async function generateEventPdf(eventId, tenantId) {
  * @param {string|null} tenantId
  */
 async function getEventStats(tenantId, createdBy) {
-  const where = {
-    ...tenantScope(tenantId),
-    ...(createdBy ? { createdBy } : {}),
+  // Build raw SQL conditions so created_by (added via migration) is always used
+  const conditions = [];
+  if (tenantId) conditions.push(Prisma.sql`tenant_id = ${tenantId}::uuid`);
+  if (createdBy && !tenantId) conditions.push(Prisma.sql`created_by = ${createdBy}::uuid`);
+
+  const whereClause = conditions.length
+    ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`
+    : Prisma.empty;
+
+  const rows = await prisma.$queryRaw(Prisma.sql`
+    SELECT
+      COUNT(*)                                          AS "total",
+      COUNT(*) FILTER (WHERE status = 'planning')      AS "planning",
+      COUNT(*) FILTER (WHERE status = 'active')        AS "active",
+      COUNT(*) FILTER (WHERE status = 'confirmed')     AS "confirmed",
+      COUNT(*) FILTER (WHERE status = 'completed')     AS "completed",
+      COUNT(*) FILTER (WHERE status = 'cancelled')     AS "cancelled"
+    FROM events ${whereClause}
+  `);
+
+  const r = rows[0] ?? {};
+  return {
+    total:     Number(r.total     ?? 0),
+    planning:  Number(r.planning  ?? 0),
+    active:    Number(r.active    ?? 0),
+    confirmed: Number(r.confirmed ?? 0),
+    completed: Number(r.completed ?? 0),
+    cancelled: Number(r.cancelled ?? 0),
   };
-
-  const [planning, active, completed, cancelled, total] = await Promise.all([
-    prisma.event.count({ where: { ...where, status: 'planning' } }),
-    prisma.event.count({ where: { ...where, status: 'active' } }),
-    prisma.event.count({ where: { ...where, status: 'completed' } }),
-    prisma.event.count({ where: { ...where, status: 'cancelled' } }),
-    prisma.event.count({ where }),
-  ]);
-
-  return { total, planning, active, completed, cancelled };
 }
 
 module.exports = {
