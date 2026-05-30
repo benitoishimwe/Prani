@@ -412,8 +412,8 @@ async function generateEventPdf(eventId, tenantId) {
 async function getEventStats(tenantId, createdBy) {
   // Build raw SQL conditions so created_by (added via migration) is always used
   const conditions = [];
-  if (tenantId) conditions.push(Prisma.sql`tenant_id = ${tenantId}::uuid`);
-  if (createdBy && !tenantId) conditions.push(Prisma.sql`created_by = ${createdBy}::uuid`);
+  if (tenantId) conditions.push(Prisma.sql`tenant_id = ${tenantId}`);
+  if (createdBy && !tenantId) conditions.push(Prisma.sql`created_by = ${createdBy}`);
 
   const whereClause = conditions.length
     ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`

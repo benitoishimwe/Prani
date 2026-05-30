@@ -14,10 +14,8 @@ router.use(authenticate);
 router.get('/plan', async (req, res, next) => {
   try {
     const { tenantId, userId } = req.user;
-    if (!tenantId) return R.badRequest(res, 'Tenant context required');
-
     const { eventId } = req.query;
-    const plan = await plannerService.getOrCreatePlan({ userId, tenantId, eventId });
+    const plan = await plannerService.getOrCreatePlan({ userId, tenantId: tenantId || null, eventId });
     return R.ok(res, plan);
   } catch (err) {
     next(err);

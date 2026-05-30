@@ -105,7 +105,7 @@ router.get('/:planId', async (req, res, next) => {
 // PATCH /:planId
 router.patch('/:planId', async (req, res, next) => {
   try {
-    const { weddingDate, wedding_date, theme, primaryColor, secondaryColor, totalBudget, total_budget, notes } = req.body;
+    const { weddingDate, wedding_date, theme, primaryColor, secondaryColor, totalBudget, total_budget, notes, eventId } = req.body;
     const plan = await plannerService.updatePlan(req.params.planId, req.user.userId, {
       weddingDate: weddingDate ?? wedding_date,
       theme,
@@ -113,6 +113,7 @@ router.patch('/:planId', async (req, res, next) => {
       secondaryColor,
       totalBudget: totalBudget ?? total_budget,
       notes,
+      eventId,
     });
     return R.ok(res, plan, 'Plan updated');
   } catch (err) {

@@ -21,28 +21,31 @@ const TABS = [
 const THEMES = ['Modern', 'Rustic', 'Beach', 'Garden', 'Traditional', 'Elegant', 'Bohemian', 'Minimalist'];
 
 export default function PlannerPage() {
-  const { isClient } = useAuth();
+  const { isClient, isEventManager } = useAuth();
   const [plan, setPlan]         = useState(null);
   const [loading, setLoading]   = useState(true);
   const [creating, setCreating] = useState(false);
+  const [syncing, setSyncing]   = useState(false);
   const [tab, setTab]           = useState('overview');
   const [events, setEvents]     = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
+  const [showEventPicker, setShowEventPicker] = useState(false);
   const [form, setForm] = useState({ wedding_date: '', theme: 'Modern', total_budget: '' });
 
   useEffect(() => {
     const load = async () => {
       const [planRes, evRes] = await Promise.allSettled([
         plannerAPI.getCurrent(),
-        eventsAPI.list({ limit: 20 }),
+        eventsAPI.list({ size: 20 }),
       ]);
       if (planRes.status === 'fulfilled') setPlan(planRes.value.data);
       if (evRes.status === 'fulfilled') {
         const data = evRes.value.data;
         const list = Array.isArray(data) ? data : (data.events ?? data.content ?? []);
         setEvents(list);
-        // Auto-select first event and pre-fill form
-        if (list.length > 0) prefillFromEvent(list[0], list[0].eventId || list[0].id);
+        if (list.length > 0 && planRes.status !== 'fulfilled') {
+          prefillFromEvent(list[0], list[0].eventId || list[0].id);
+        }
       }
       setLoading(false);
     };
@@ -63,6 +66,28 @@ export default function PlannerPage() {
     prefillFromEvent(ev, eventId);
   };
 
+  // Link existing plan to a different event and sync budget/date
+  const handleLinkEvent = async (eventId) => {
+    const ev = events.find(e => (e.eventId || e.id) === eventId);
+    if (!ev || !plan) return;
+    setSyncing(true);
+    setShowEventPicker(false);
+    try {
+      const budget = ev.budget ? Number(ev.budget) : undefined;
+      const weddingDate = ev.eventDate || ev.event_date || undefined;
+      const { data } = await plannerAPI.update(plan.planId, {
+        eventId,
+        ...(budget ? { totalBudget: budget } : {}),
+        ...(weddingDate ? { weddingDate } : {}),
+      });
+      setPlan(data);
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to link event');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setCreating(true);
@@ -79,6 +104,10 @@ export default function PlannerPage() {
       setCreating(false);
     }
   };
+
+  const linkedEvent = plan?.eventId
+    ? events.find(e => (e.eventId || e.id) === plan.eventId)
+    : null;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -103,7 +132,7 @@ export default function PlannerPage() {
         </div>
 
         {/* Event suggestion banner */}
-        {isClient && events.length > 0 && (
+        {(isClient || isEventManager) && events.length > 0 && (
           <div className="mb-5 p-4 rounded-xl bg-[#FFF8E7] border border-[#C9A84C40]">
             <p className="text-xs font-semibold text-[#C9A84C] uppercase tracking-wide mb-2 flex items-center gap-1">
               <Calendar size={12} /> Link to your event
@@ -193,11 +222,69 @@ export default function PlannerPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab Bar */}
-      <div className="bg-white border-b border-[#EBE5DB] px-4 flex-shrink-0">
+      {/* Event context banner */}
+      <div className="bg-white border-b border-[#EBE5DB] px-4 pt-3 pb-0 flex-shrink-0">
+        {/* Event selector row */}
+        <div className="flex items-center justify-between gap-3 pb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Heart size={14} className="text-[#C9A84C] flex-shrink-0" />
+            {linkedEvent ? (
+              <div className="min-w-0">
+                <p className="text-xs text-[#9CA3AF] uppercase tracking-wide font-semibold">Planning for</p>
+                <p className="text-sm font-bold text-[#2D2D2D] truncate">{linkedEvent.name}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-[#9CA3AF]">No event linked — select one below</p>
+            )}
+          </div>
+
+          {events.length > 0 && (
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setShowEventPicker(p => !p)}
+                disabled={syncing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#EBE5DB] text-xs font-semibold text-[#C9A84C] hover:bg-[#FFF8E7] transition-colors"
+              >
+                {syncing ? <Loader2 size={12} className="animate-spin" /> : <Calendar size={12} />}
+                {linkedEvent ? 'Change event' : 'Link event'}
+              </button>
+
+              {showEventPicker && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl shadow-xl border border-[#EBE5DB] z-50 overflow-hidden">
+                  <p className="px-3 py-2 text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide border-b border-[#EBE5DB]">
+                    Select event to plan for
+                  </p>
+                  {events.map(ev => {
+                    const id = ev.eventId || ev.id;
+                    const date = ev.eventDate || ev.event_date;
+                    const isLinked = plan?.eventId === id;
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => handleLinkEvent(id)}
+                        className={`w-full text-left px-3 py-2.5 hover:bg-[#FFF8E7] transition-colors flex items-center justify-between gap-2 border-b border-[#F9F9F9] last:border-0 ${isLinked ? 'bg-[#FFF8E7]' : ''}`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-[#2D2D2D] truncate">{ev.name}</p>
+                          <p className="text-xs text-[#9CA3AF]">
+                            {date ? new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'No date'}
+                            {ev.budget ? ` · ${Number(ev.budget).toLocaleString()} RWF` : ''}
+                          </p>
+                        </div>
+                        {isLinked && <span className="text-[#C9A84C] text-xs font-bold flex-shrink-0">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Tab Bar */}
         <div className="flex overflow-x-auto hide-scrollbar">
           {TABS.map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setTab(key)}
+            <button key={key} onClick={() => { setTab(key); setShowEventPicker(false); }}
               className={`flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
                 tab === key
                   ? 'border-[#C9A84C] text-[#C9A84C]'
@@ -211,7 +298,7 @@ export default function PlannerPage() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" onClick={() => setShowEventPicker(false)}>
         <TabComponent plan={plan} onPlanUpdate={setPlan} />
       </div>
     </div>

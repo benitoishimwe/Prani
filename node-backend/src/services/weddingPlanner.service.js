@@ -14,41 +14,53 @@ const { AppError } = require('../middleware/errorHandler');
  * @param {string} [params.eventId]
  */
 async function getOrCreatePlan({ userId, tenantId, eventId }) {
-  let plan = await prisma.weddingPlan.findFirst({
-    where: { userId, tenantId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: {
-          budgetItems: true,
-          guests: true,
-          venues: true,
-          menuItems: true,
-          designAssets: true,
-        },
-      },
+  const countInclude = {
+    _count: {
+      select: { budgetItems: true, guests: true, venues: true, menuItems: true, designAssets: true },
     },
+  };
+
+  let plan = await prisma.weddingPlan.findFirst({
+    where: tenantId ? { userId, tenantId } : { userId },
+    orderBy: { createdAt: 'desc' },
+    include: countInclude,
   });
 
   if (!plan) {
+    // Seed budget and wedding date from the linked event when creating a new plan
+    let seedData = {};
+    const resolvedEventId = eventId || null;
+    if (resolvedEventId) {
+      try {
+        const ev = await prisma.event.findUnique({
+          where: { eventId: resolvedEventId },
+          select: { budget: true, eventDate: true },
+        });
+        if (ev?.budget) seedData.totalBudget = ev.budget;
+        if (ev?.eventDate) seedData.weddingDate = ev.eventDate;
+      } catch (_) { /* event lookup is best-effort */ }
+    }
+
     plan = await prisma.weddingPlan.create({
-      data: {
-        userId,
-        tenantId,
-        eventId: eventId || null,
-      },
-      include: {
-        _count: {
-          select: {
-            budgetItems: true,
-            guests: true,
-            venues: true,
-            menuItems: true,
-            designAssets: true,
-          },
-        },
-      },
+      data: { userId, tenantId: tenantId || null, eventId: resolvedEventId, ...seedData },
+      include: countInclude,
     });
+  } else if (eventId && plan.eventId !== eventId) {
+    // User switched to a different event — re-link and sync
+    try {
+      const ev = await prisma.event.findUnique({
+        where: { eventId },
+        select: { budget: true, eventDate: true },
+      });
+      const syncData = { eventId };
+      if (ev?.budget && !plan.totalBudget) syncData.totalBudget = ev.budget;
+      if (ev?.eventDate && !plan.weddingDate) syncData.weddingDate = ev.eventDate;
+      plan = await prisma.weddingPlan.update({
+        where: { planId: plan.planId },
+        data: syncData,
+        include: countInclude,
+      });
+    } catch (_) { /* sync is best-effort */ }
   }
 
   return plan;
@@ -74,7 +86,7 @@ async function getPlanById(planId, userId) {
  * @param {string} userId
  * @param {object} updates
  */
-async function updatePlan(planId, userId, { weddingDate, theme, primaryColor, secondaryColor, totalBudget, notes }) {
+async function updatePlan(planId, userId, { weddingDate, theme, primaryColor, secondaryColor, totalBudget, notes, eventId }) {
   await getPlanById(planId, userId);
 
   const data = {};
@@ -84,6 +96,7 @@ async function updatePlan(planId, userId, { weddingDate, theme, primaryColor, se
   if (secondaryColor !== undefined) data.secondaryColor = secondaryColor;
   if (totalBudget !== undefined) data.totalBudget = totalBudget;
   if (notes !== undefined) data.notes = notes;
+  if (eventId !== undefined) data.eventId = eventId || null;
 
   return prisma.weddingPlan.update({ where: { planId }, data });
 }
