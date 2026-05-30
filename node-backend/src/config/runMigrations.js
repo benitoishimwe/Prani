@@ -9,6 +9,20 @@ const prisma = require('./prisma');
  * created once; subsequent boots are no-ops.
  */
 const MIGRATIONS = [
+  // ── Core event columns added after initial schema ─────────────────────────
+  `ALTER TABLE events
+     ADD COLUMN IF NOT EXISTS created_by       TEXT REFERENCES users(user_id),
+     ADD COLUMN IF NOT EXISTS event_type_slug  TEXT,
+     ADD COLUMN IF NOT EXISTS client_name      TEXT,
+     ADD COLUMN IF NOT EXISTS guest_count      INTEGER,
+     ADD COLUMN IF NOT EXISTS budget           NUMERIC,
+     ADD COLUMN IF NOT EXISTS notes            TEXT,
+     ADD COLUMN IF NOT EXISTS checklist        JSONB,
+     ADD COLUMN IF NOT EXISTS timeline         JSONB,
+     ADD COLUMN IF NOT EXISTS greatness_score  INTEGER DEFAULT 0,
+     ADD COLUMN IF NOT EXISTS staff_ids        TEXT[] DEFAULT '{}',
+     ADD COLUMN IF NOT EXISTS vendor_ids       TEXT[] DEFAULT '{}'`,
+
   // ── Guest check-in columns on events ──────────────────────────────────────
   `ALTER TABLE events
      ADD COLUMN IF NOT EXISTS guest_checkin_enabled            BOOLEAN NOT NULL DEFAULT FALSE,
