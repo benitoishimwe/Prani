@@ -119,12 +119,19 @@ async function verifyOtp({ attemptId, otpCode, ipAddress }) {
   return { email: attempt.email, guestName: attempt.guestName, eventName: event?.name, checkedInAt: now };
 }
 
-async function getCheckins({ eventId, tenantId }) {
-  const event = await prisma.event.findFirst({
-    where: { eventId, tenantId },
-    select: { eventId: true },
-  });
-  if (!event) throw Object.assign(new Error('Event not found'), { status: 404 });
+function eventAccessCondition(tenantId, createdBy) {
+  if (tenantId) return `tenant_id = '${tenantId}'`;
+  if (createdBy) return `(tenant_id IS NULL OR created_by = '${createdBy}')`;
+  return 'tenant_id IS NULL';
+}
+
+async function getCheckins({ eventId, tenantId, createdBy }) {
+  const condition = eventAccessCondition(tenantId, createdBy);
+  const events = await prisma.$queryRawUnsafe(
+    `SELECT event_id FROM events WHERE event_id = $1 AND (${condition})`,
+    eventId
+  );
+  if (!events[0]) throw Object.assign(new Error('Event not found'), { status: 404 });
 
   return prisma.guestCheckin.findMany({
     where: { eventId },
@@ -132,23 +139,32 @@ async function getCheckins({ eventId, tenantId }) {
   });
 }
 
-async function getQrData({ eventId, tenantId }) {
-  const event = await prisma.event.findFirst({
-    where: { eventId, tenantId },
-    select: { eventId: true, name: true, guestCheckinEnabled: true },
-  });
-  if (!event) throw Object.assign(new Error('Event not found'), { status: 404 });
-  return event;
+async function getQrData({ eventId, tenantId, createdBy }) {
+  const condition = eventAccessCondition(tenantId, createdBy);
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT event_id AS "eventId", name,
+            COALESCE(guest_checkin_enabled, false) AS "guestCheckinEnabled"
+     FROM events WHERE event_id = $1 AND (${condition})`,
+    eventId
+  );
+  if (!rows[0]) throw Object.assign(new Error('Event not found'), { status: 404 });
+  return rows[0];
 }
 
-async function toggleCheckin({ eventId, tenantId, enabled }) {
-  const event = await prisma.event.findFirst({ where: { eventId, tenantId } });
-  if (!event) throw Object.assign(new Error('Event not found'), { status: 404 });
-  return prisma.event.update({
-    where: { eventId },
-    data: { guestCheckinEnabled: enabled },
-    select: { eventId: true, guestCheckinEnabled: true },
-  });
+async function toggleCheckin({ eventId, tenantId, createdBy, enabled }) {
+  const condition = eventAccessCondition(tenantId, createdBy);
+  const events = await prisma.$queryRawUnsafe(
+    `SELECT event_id FROM events WHERE event_id = $1 AND (${condition})`,
+    eventId
+  );
+  if (!events[0]) throw Object.assign(new Error('Event not found'), { status: 404 });
+
+  await prisma.$queryRawUnsafe(
+    `UPDATE events SET guest_checkin_enabled = $1 WHERE event_id = $2`,
+    enabled,
+    eventId
+  );
+  return { eventId, guestCheckinEnabled: enabled };
 }
 
 async function expireStaleAttempts() {

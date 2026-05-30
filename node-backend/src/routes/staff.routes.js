@@ -233,8 +233,13 @@ router.get('/me/recent-transactions', authenticate, async (req, res, next) => {
 router.get('/', authenticate, async (req, res, next) => {
   try {
     const tenantId = req.user.role === Roles.SUPER_ADMIN ? null : req.user.tenantId;
-    const { search, page, size } = req.query;
 
+    // Self-serve users (no tenant) have no shared staff pool — return empty
+    if (!tenantId && req.user.role !== Roles.SUPER_ADMIN) {
+      return R.ok(res, { staff: [], total: 0, page: 1, size: 20 });
+    }
+
+    const { search, page, size } = req.query;
     const result = await staffService.listStaff({
       tenantId,
       search: search || undefined,

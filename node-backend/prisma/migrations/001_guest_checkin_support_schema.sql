@@ -4,6 +4,9 @@
 -- All statements are idempotent (safe to run multiple times).
 -- ============================================================
 
+-- 0. Allow null tenant_id on event_tasks (self-serve event managers have no tenant)
+ALTER TABLE event_tasks ALTER COLUMN tenant_id DROP NOT NULL;
+
 -- 1. Core event columns added after initial schema
 ALTER TABLE events
   ADD COLUMN IF NOT EXISTS created_by       TEXT REFERENCES users(user_id),

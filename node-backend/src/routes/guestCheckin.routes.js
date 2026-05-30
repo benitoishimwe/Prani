@@ -16,8 +16,8 @@ router.get('/events/:eventId/guest-qr', authenticate,
   async (req, res, next) => {
     try {
       const { eventId } = req.params;
-      const tenantId = req.user.tenantId;
-      const event = await guestCheckinService.getQrData({ eventId, tenantId });
+      const { tenantId, userId: createdBy } = req.user;
+      const event = await guestCheckinService.getQrData({ eventId, tenantId, createdBy });
       const checkinUrl = `${config.frontendUrl}/guest/checkin/${eventId}`;
       const qrDataUrl = await generateQrCodeBase64(checkinUrl, { width: 400 });
       return R.ok(res, { qrDataUrl, checkinUrl, eventName: event.name, guestCheckinEnabled: event.guestCheckinEnabled });
@@ -33,7 +33,12 @@ router.patch('/events/:eventId/guest-checkin-toggle', authenticate,
       const { eventId } = req.params;
       const { enabled } = req.body;
       if (typeof enabled !== 'boolean') return R.badRequest(res, '"enabled" must be a boolean');
-      const result = await guestCheckinService.toggleCheckin({ eventId, tenantId: req.user.tenantId, enabled });
+      const result = await guestCheckinService.toggleCheckin({
+        eventId,
+        tenantId: req.user.tenantId,
+        createdBy: req.user.userId,
+        enabled,
+      });
       return R.ok(res, result);
     } catch (err) { next(err); }
   }
@@ -47,6 +52,7 @@ router.get('/events/:eventId/guest-checkins', authenticate,
       const checkins = await guestCheckinService.getCheckins({
         eventId: req.params.eventId,
         tenantId: req.user.tenantId,
+        createdBy: req.user.userId,
       });
       return R.ok(res, checkins);
     } catch (err) { next(err); }

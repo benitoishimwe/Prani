@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLang } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { eventsAPI, staffAPI, vendorsAPI, guestCheckinAPI } from '../../services/api';
+import api, { eventsAPI, staffAPI, vendorsAPI, guestCheckinAPI } from '../../services/api';
 import { X, FileText, Loader, Users, LayoutList, Camera, Calendar, MapPin, DollarSign, UserCheck, Pencil, Save, Trash2, ClipboardList, Plus, UserCircle, CheckCircle2, Circle, QrCode, Download, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -79,11 +79,18 @@ export default function EventDetailModal({ event, onClose, onUpdate }) {
       setLoading(true);
       setError('');
       try {
-        // Clients have no tenant, so skip staff/vendor fetches to avoid 400 errors
+        // Self-serve users (no tenantId) use marketplace for vendors; staff list is empty
+        const hasTenant = !!user?.tenantId;
+        const vendorFetch = isClient
+          ? Promise.resolve(null)
+          : hasTenant
+            ? vendorsAPI.list({ size: 100 })
+            : api.get('/marketplace', { params: { size: 100 } });
+
         const fetches = [
           eventsAPI.get(eventId),
-          isClient ? Promise.resolve(null) : staffAPI.list({ size: 100 }),
-          isClient ? Promise.resolve(null) : vendorsAPI.list({ size: 100 }),
+          (isClient || !hasTenant) ? Promise.resolve(null) : staffAPI.list({ size: 100 }),
+          vendorFetch,
           eventsAPI.listTasks(eventId),
         ];
         const [evRes, stRes, vnRes, taskRes] = await Promise.allSettled(fetches);

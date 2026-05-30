@@ -307,23 +307,43 @@ async function listEventTasks(eventId, tenantId, status) {
  * @param {object} params
  */
 async function createTask({ eventId, tenantId, title, description, category, dueDate, assignedTo, priority, createdBy }) {
-  // Verify event access
   await getEventById(eventId, tenantId);
 
-  return prisma.eventTask.create({
-    data: {
-      eventId,
-      tenantId,
+  // Use raw SQL so null tenantId (self-serve event managers) is accepted without
+  // Prisma enforcing the non-nullable relation constraint on EventTask.tenant.
+  const rows = await prisma.$queryRaw(Prisma.sql`
+    INSERT INTO event_tasks (
+      task_id, event_id, tenant_id, title, description, category,
+      due_date, assigned_to, priority, status, created_by
+    ) VALUES (
+      gen_random_uuid(),
+      ${eventId}::uuid,
+      ${tenantId ?? null}::uuid,
+      ${title},
+      ${description || null},
+      ${category || null},
+      ${dueDate ? new Date(dueDate).toISOString() : null}::timestamptz,
+      ${assignedTo || null}::uuid,
+      ${priority || 'medium'},
+      'todo',
+      ${createdBy || null}::uuid
+    )
+    RETURNING
+      task_id      AS "taskId",
+      event_id     AS "eventId",
+      tenant_id    AS "tenantId",
       title,
-      description: description || null,
-      category: category || null,
-      dueDate: dueDate ? new Date(dueDate) : null,
-      assignedTo: assignedTo || null,
-      priority: priority || 'medium',
-      status: 'todo',
-      createdBy: createdBy || null,
-    },
-  });
+      description,
+      category,
+      due_date     AS "dueDate",
+      assigned_to  AS "assignedTo",
+      priority,
+      status,
+      created_by   AS "createdBy",
+      created_at   AS "createdAt",
+      updated_at   AS "updatedAt"
+  `);
+  return rows[0];
 }
 
 /**
