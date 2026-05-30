@@ -48,10 +48,11 @@ router.post(
   async (req, res, next) => {
     try {
       const isClient = req.user.role === Roles.CLIENT;
+      const isEventManager = req.user.role === Roles.EVENT_MANAGER;
       const tenantId = req.user.tenantId;
 
-      // Clients are self-serve and have no tenant; all other roles require one
-      if (!tenantId && !isClient) return R.badRequest(res, 'Tenant context required');
+      // Clients and self-serve event managers may have no tenant — allow them
+      if (!tenantId && !isClient && !isEventManager) return R.badRequest(res, 'Tenant context required');
 
       const { name, eventDate, venue, eventTypeSlug, budget, guestCount, notes } = req.body;
       if (!name) return R.badRequest(res, 'Event name is required');
@@ -326,8 +327,7 @@ router.get('/:eventId/tasks', authenticate, async (req, res, next) => {
 // ─── POST /:eventId/tasks — create task ──────────────────────────────────────
 router.post('/:eventId/tasks', authenticate, async (req, res, next) => {
   try {
-    const tenantId = req.user.tenantId;
-    if (!tenantId) return R.badRequest(res, 'Tenant context required');
+    const tenantId = req.user.tenantId || null;
 
     const { title, description, category, dueDate, assignedTo, priority } = req.body;
     if (!title) return R.badRequest(res, 'Task title is required');
