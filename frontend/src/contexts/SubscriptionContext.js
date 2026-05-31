@@ -37,7 +37,10 @@ export function SubscriptionProvider({ children }) {
   useEffect(() => { fetchSubscription(); }, [fetchSubscription]);
 
   const subscription   = subDetails?.subscription  ?? null;
-  const currentPlan    = subDetails?.plan           ?? 'max';
+  // Default to 'free' while loading so no feature-gated items flash before the
+  // real subscription arrives. The catch block sets an explicit 'max' if the
+  // API call fails entirely (dev fallback).
+  const currentPlan    = subDetails?.plan           ?? 'free';
   const isOnTrial      = subscription?.status === 'trial';
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
@@ -57,7 +60,11 @@ export function SubscriptionProvider({ children }) {
     defaultTrialDaysLeft = Math.max(0, TRIAL_DAYS - elapsed);
   }
 
+  // Only evaluate the default trial once the API response has arrived (subDetails !== null).
+  // While loading (subDetails === null), we treat it as "not yet known" to avoid a
+  // flash where features appear then disappear as the real subscription row loads.
   const isOnDefaultTrial =
+    subDetails !== null &&
     hasNoSubscriptionRow &&
     !dbTrialExpired &&
     (defaultTrialDaysLeft === null || defaultTrialDaysLeft > 0);

@@ -67,6 +67,23 @@ async function createFreeSubscription(userId, tenantId) {
   });
 }
 
+// Called on standalone signup — gives every new user a 14-day trial automatically.
+async function createAutoTrial(userId, tenantId) {
+  const trialEndsAt = new Date();
+  trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+  // Use 'pro' as the plan so it passes DB check constraints.
+  // status='trial' + trialEndsAt is what drives trial behaviour in the frontend.
+  return prisma.subscription.create({
+    data: {
+      userId,
+      tenantId: tenantId || null,
+      plan: 'pro',
+      status: 'trial',
+      trialEndsAt,
+    },
+  });
+}
+
 async function getActiveSubscription(userId) {
   return _findActiveSubscription(userId);
 }
@@ -379,6 +396,7 @@ async function handleStripeWebhook({ event }) {
 
 module.exports = {
   createFreeSubscription,
+  createAutoTrial,
   getActiveSubscription,
   getCurrentPlan,
   isFeatureEnabled,

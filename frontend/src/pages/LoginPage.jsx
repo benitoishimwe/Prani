@@ -21,6 +21,20 @@ const ROLE_PATHS = {
   event_manager: '/dashboard',
 };
 
+// Map server error codes / messages to per-field or form-level errors
+function mapServerError(err) {
+  const code = err.response?.data?.error;
+  const msg  = err.response?.data?.message || '';
+  if (code === 'EMAIL_TAKEN')         return { email: 'This email is already registered. Try signing in instead.' };
+  if (code === 'INVALID_CREDENTIALS') return { _form: 'Incorrect email or password. Please try again.' };
+  if (code === 'ACCOUNT_INACTIVE')    return { _form: 'Your account has been deactivated. Contact support.' };
+  if (code === 'ACCOUNT_NOT_FOUND')   return { email: 'No account found with this email address.' };
+  if (msg.toLowerCase().includes('email')) return { email: msg };
+  if (msg.toLowerCase().includes('password')) return { password: msg };
+  if (msg.toLowerCase().includes('name'))     return { name: msg };
+  return { _form: msg || 'Something went wrong. Please try again.' };
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const { t, lang, switchLang } = useLang();
@@ -30,15 +44,43 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '', name: '', role: 'client' });
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [mfaState, setMfaState] = useState(null);
   const [mfaMethod, setMfaMethod] = useState('totp');
   const [mfaCode, setMfaCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
 
+  const validate = () => {
+    const errs = {};
+    if (tab === 'register') {
+      if (!form.name.trim())
+        errs.name = 'Full name is required.';
+      else if (form.name.trim().length < 2)
+        errs.name = 'Name must be at least 2 characters.';
+    }
+    if (!form.email.trim())
+      errs.email = 'Email address is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
+      errs.email = 'Please enter a valid email address (e.g. you@example.com).';
+
+    if (!form.password)
+      errs.password = 'Password is required.';
+    else if (tab === 'register') {
+      if (form.password.length < 8)
+        errs.password = 'Password must be at least 8 characters.';
+      else if (!/[A-Z]/.test(form.password))
+        errs.password = 'Password must include at least one uppercase letter.';
+      else if (!/[0-9!@#$%^&*()\-_=+]/.test(form.password))
+        errs.password = 'Password must include a number or special character (e.g. ! @ # $ %).';
+    }
+    return errs;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    const errs = validate();
+    if (Object.keys(errs).length) { setFieldErrors(errs); return; }
+    setFieldErrors({});
     setLoading(true);
     try {
       if (tab === 'register') {
@@ -58,7 +100,7 @@ export default function LoginPage() {
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'An error occurred');
+      setFieldErrors(mapServerError(err));
     } finally {
       setLoading(false);
     }
@@ -70,7 +112,7 @@ export default function LoginPage() {
       await authAPI.sendEmailOtp(mfaState.userId);
       setOtpSent(true);
     } catch {
-      setError('Failed to send OTP');
+      setFieldErrors({ _form: 'Failed to send OTP. Please try again.' });
     } finally {
       setLoading(false);
     }
@@ -78,7 +120,7 @@ export default function LoginPage() {
 
   const handleMfaVerify = async (e) => {
     e.preventDefault();
-    setError('');
+    setFieldErrors({});
     setLoading(true);
     try {
       const res = await authAPI.verifyMfa({ userId: mfaState.userId, code: mfaCode, method: mfaMethod });
@@ -86,7 +128,8 @@ export default function LoginPage() {
       login(payload.user, payload.token);
       navigate(ROLE_PATHS[payload.user.role] ?? '/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Invalid code');
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Invalid code. Please try again.';
+      setFieldErrors({ _form: msg });
     } finally {
       setLoading(false);
     }
@@ -197,7 +240,7 @@ export default function LoginPage() {
                   {['login', 'register'].map((t_) => (
                     <button
                       key={t_}
-                      onClick={() => { setTab(t_); setError(''); }}
+                      onClick={() => { setTab(t_); setFieldErrors({}); }}
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                         tab === t_ ? 'bg-white text-[#0F4C5C] shadow-sm' : 'text-[#6B7280]'
                       }`}
@@ -208,7 +251,7 @@ export default function LoginPage() {
                   ))}
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                   {tab === 'register' && (
                     <>
                       {/* Role selector */}
@@ -240,27 +283,27 @@ export default function LoginPage() {
                       <div>
                         <label className="block text-sm font-medium text-[#111827] mb-1.5">{t('auth.name')}</label>
                         <input
-                          className="input-wedding"
+                          className={`input-wedding ${fieldErrors.name ? 'border-[#DC2626] focus:border-[#DC2626]' : ''}`}
                           placeholder="Amina Uwase"
                           value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          required
+                          onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors(p => ({ ...p, name: '' })); }}
                           data-testid="register-name"
                         />
+                        {fieldErrors.name && <p className="text-xs text-[#DC2626] mt-1">{fieldErrors.name}</p>}
                       </div>
                     </>
                   )}
                   <div>
                     <label className="block text-sm font-medium text-[#111827] mb-1.5">{t('auth.email')}</label>
                     <input
-                      className="input-wedding"
+                      className={`input-wedding ${fieldErrors.email ? 'border-[#DC2626] focus:border-[#DC2626]' : ''}`}
                       type="email"
                       placeholder="you@example.rw"
                       value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      required
+                      onChange={(e) => { setForm({ ...form, email: e.target.value }); setFieldErrors(p => ({ ...p, email: '' })); }}
                       data-testid="login-email"
                     />
+                    {fieldErrors.email && <p className="text-xs text-[#DC2626] mt-1">{fieldErrors.email}</p>}
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -271,13 +314,11 @@ export default function LoginPage() {
                     </div>
                     <div className="relative">
                       <input
-                        className="input-wedding pr-10"
+                        className={`input-wedding pr-10 ${fieldErrors.password ? 'border-[#DC2626] focus:border-[#DC2626]' : ''}`}
                         type={showPwd ? 'text' : 'password'}
-                        placeholder={tab === 'register' ? 'Min. 8 characters' : '••••••••'}
+                        placeholder={tab === 'register' ? 'Min. 8 chars, 1 uppercase, 1 number/symbol' : '••••••••'}
                         value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        minLength={tab === 'register' ? 8 : undefined}
-                        required
+                        onChange={(e) => { setForm({ ...form, password: e.target.value }); setFieldErrors(p => ({ ...p, password: '' })); }}
                         data-testid="login-password"
                       />
                       <button
@@ -288,10 +329,11 @@ export default function LoginPage() {
                         {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
+                    {fieldErrors.password && <p className="text-xs text-[#DC2626] mt-1">{fieldErrors.password}</p>}
                   </div>
 
-                  {error && (
-                    <p className="text-sm text-[#DC2626] bg-[#FEE2E2] rounded-lg px-3 py-2" data-testid="login-error">{error}</p>
+                  {fieldErrors._form && (
+                    <p className="text-sm text-[#DC2626] bg-[#FEE2E2] rounded-lg px-3 py-2" data-testid="login-error">{fieldErrors._form}</p>
                   )}
 
                   <button
@@ -374,7 +416,7 @@ export default function LoginPage() {
                       {mfaMethod === 'totp' ? t('auth.totp_prompt') : t('auth.email_otp_prompt')}
                     </p>
                   </div>
-                  {error && <p className="text-sm text-[#DC2626] bg-[#FEE2E2] rounded-lg px-3 py-2" data-testid="mfa-error">{error}</p>}
+                  {fieldErrors._form && <p className="text-sm text-[#DC2626] bg-[#FEE2E2] rounded-lg px-3 py-2" data-testid="mfa-error">{fieldErrors._form}</p>}
                   <button
                     type="submit"
                     disabled={loading || mfaCode.length < 6}

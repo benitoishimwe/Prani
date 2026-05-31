@@ -61,7 +61,7 @@ async function register({ email, password, name, role = 'client', tenantId = nul
     },
   });
 
-  await subscriptionService.createFreeSubscription(user.userId);
+  await subscriptionService.createAutoTrial(user.userId, user.tenantId || null);
 
   const token = createToken(user.userId, user.role, user.email, user.tenantId);
 
